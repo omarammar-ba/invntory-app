@@ -85,6 +85,23 @@
         visibility: visible;
         transition: opacity 280ms ease, visibility 280ms ease;
       }
+      #app-launch-splash::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: max(18%, calc(env(safe-area-inset-bottom) + 96px));
+        background: linear-gradient(
+          to bottom,
+          rgba(55,48,163,0) 0%,
+          rgba(55,48,163,0.86) 52%,
+          #3730a3 76%,
+          #3730a3 100%
+        );
+        pointer-events: none;
+        z-index: 0;
+      }
       #app-launch-splash.app-launch-splash--hidden {
         opacity: 0;
         visibility: hidden;
@@ -92,6 +109,7 @@
       }
       .app-launch-splash__content {
         position: relative;
+        z-index: 1;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -151,6 +169,7 @@
 
       .app-launch-splash__credit {
         position: absolute;
+        z-index: 1;
         left: 50%;
         bottom: max(26px, calc(env(safe-area-inset-bottom) + 14px));
         transform: translateX(-50%);
