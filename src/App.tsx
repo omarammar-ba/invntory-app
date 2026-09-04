@@ -1068,46 +1068,132 @@ const App: React.FC = () => {
       );
     } else {
       const logsByCategory = new Map<string, LogEntry[]>();
-      const getLogTime = (log: any) => log.timestamp?.seconds || 0;
+
+      const getLogTime = (log: LogEntry) => {
+        const timestamp: any = log?.timestamp;
+
+        if (timestamp && typeof timestamp.toMillis === 'function') {
+          return timestamp.toMillis();
+        }
+
+        if (timestamp && typeof timestamp.seconds === 'number') {
+          return timestamp.seconds * 1000;
+        }
+
+        const parsed = new Date(timestamp as any).getTime();
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+
+      const publishEmployeeLogs = () => {
+        if (cancelled) return;
+
+        setLogs(
+          Array.from(logsByCategory.values())
+            .flat()
+            .sort((a, b) => getLogTime(b) - getLogTime(a))
+            .slice(0, 100)
+        );
+      };
+
+      const isIndexNotReadyError = (error: any) => {
+        const code = String(error?.code || '').toLowerCase();
+        const message = String(error?.message || '').toLowerCase();
+
+        return (
+          code.includes('failed-precondition') ||
+          message.includes('requires an index') ||
+          message.includes('index is currently building')
+        );
+      };
 
       Array.from(visibleCategoryIds).forEach(categoryId => {
-        unsubs.push(
-          db
+        let activeUnsubscribe: (() => void) | null = null;
+        let fallbackStarted = false;
+
+        const applySnapshot = (snapshot: any) => {
+          if (cancelled) return;
+
+          const categoryLogs = (
+            snapshot.empty
+              ? []
+              : snapshot.docs.map((document: any) => ({
+                  id: document.id,
+                  ...document.data()
+                })) as LogEntry[]
+          )
+            .sort((a, b) => getLogTime(b) - getLogTime(a))
+            .slice(0, 100);
+
+          logsByCategory.set(categoryId, categoryLogs);
+          publishEmployeeLogs();
+        };
+
+        const handleFallbackError = (error: any) => {
+          if (cancelled) return;
+
+          if (isPermissionDenied(error)) {
+            logsByCategory.set(categoryId, []);
+            publishEmployeeLogs();
+            return;
+          }
+
+          console.error(`Logs fallback subscription failed for ${categoryId}:`, error);
+        };
+
+        const startFallback = () => {
+          if (cancelled || fallbackStarted) return;
+          fallbackStarted = true;
+
+          activeUnsubscribe?.();
+
+          // The normal query below is faster and returns only the newest 100,
+          // but it needs the composite categoryId + timestamp Firestore index.
+          // If that index has not been deployed yet (or is still building), keep
+          // the employee audit log functional immediately with a single-field
+          // category query and sort the results locally. The next app launch will
+          // automatically use the indexed query once Firestore has it ready.
+          activeUnsubscribe = db
             .collection('logs')
             .where('categoryId', '==', categoryId)
-            .orderBy('timestamp', 'desc')
-            .limit(100)
-            .onSnapshot(
-              snapshot => {
-                if (cancelled) return;
-                logsByCategory.set(
-                  categoryId,
-                  snapshot.empty
-                    ? []
-                    : snapshot.docs.map((document: any) => ({
-                        id: document.id,
-                        ...document.data()
-                      })) as LogEntry[]
-                );
+            .onSnapshot(applySnapshot, handleFallbackError);
+        };
 
-                setLogs(
-                  Array.from(logsByCategory.values())
-                    .flat()
-                    .sort((a, b) => getLogTime(b) - getLogTime(a))
-                    .slice(0, 100)
+        const orderedUnsubscribe = db
+          .collection('logs')
+          .where('categoryId', '==', categoryId)
+          .orderBy('timestamp', 'desc')
+          .limit(100)
+          .onSnapshot(
+            applySnapshot,
+            error => {
+              if (cancelled) return;
+
+              if (isIndexNotReadyError(error)) {
+                console.warn(
+                  `Logs index is not ready for ${categoryId}; using the safe fallback query.`,
+                  error
                 );
-              },
-              error => {
-                if (cancelled) return;
-                if (isPermissionDenied(error)) {
-                  logsByCategory.set(categoryId, []);
-                  setLogs(Array.from(logsByCategory.values()).flat());
-                } else {
-                  console.error(`Logs subscription failed for ${categoryId}:`, error);
-                }
+                startFallback();
+                return;
               }
-            )
-        );
+
+              if (isPermissionDenied(error)) {
+                logsByCategory.set(categoryId, []);
+                publishEmployeeLogs();
+                return;
+              }
+
+              console.error(`Logs subscription failed for ${categoryId}:`, error);
+            }
+          );
+
+        if (!fallbackStarted) {
+          activeUnsubscribe = orderedUnsubscribe;
+        } else {
+          orderedUnsubscribe?.();
+        }
+
+        unsubs.push(() => activeUnsubscribe?.());
       });
 
       if (visibleCategoryIds.size === 0) setLogs([]);
@@ -1299,24 +1385,69 @@ const App: React.FC = () => {
           return logs;
         }
 
+        // Employee log subscriptions are already scoped to categories that are
+        // visible to that employee. New logs also carry item visibility, so a
+        // fresh add/delete can appear immediately without waiting for the paged
+        // inventory list, while admin-only items stay hidden from the UI.
+        const allowedCategoryIds =
+          new Set(
+            categories
+              .filter(
+                category =>
+                  category.visibleToEmployees === true
+              )
+              .map(
+                category =>
+                  category.id
+              )
+          );
+
         const visibleNames =
           new Set(
             allItemsCombined.map(
-              item => item.name
+              item =>
+                item.name
             )
           );
 
         return logs.filter(
-          log =>
-            !log.tileName ||
-            visibleNames.has(
-              log.tileName
-            )
+          log => {
+            if (
+              log.categoryId &&
+              !allowedCategoryIds.has(
+                log.categoryId
+              )
+            ) {
+              return false;
+            }
+
+            if (
+              log.hiddenForStaff === true
+            ) {
+              return false;
+            }
+
+            if (
+              log.hiddenForStaff === false
+            ) {
+              return true;
+            }
+
+            // Legacy logs did not store item visibility. Keep the previous
+            // conservative behavior for those old records only.
+            return (
+              !log.tileName ||
+              visibleNames.has(
+                log.tileName
+              )
+            );
+          }
         );
       },
       [
         isEmployee,
         logs,
+        categories,
         allItemsCombined
       ]
     );
@@ -1327,7 +1458,8 @@ const App: React.FC = () => {
         action: string,
         tileName: string,
         details: string,
-        categoryId?: string
+        categoryId?: string,
+        hiddenForStaff = false
       ) => {
         const activeStaffName = currentStaff?.name || 'مستخدم';
 
@@ -1369,16 +1501,34 @@ const App: React.FC = () => {
           categoryId:
             String(
               catIdToUse
+            ),
+
+          hiddenForStaff:
+            Boolean(
+              hiddenForStaff
             )
         };
+
+        const localLogId =
+          'local-' +
+          Date.now() +
+          '-' +
+          Math.random()
+            .toString(36)
+            .slice(2, 7);
 
         const localLog:
           LogEntry = {
           id:
-            'local-' +
-            Date.now(),
+            localLogId,
 
-          ...newLog
+          ...newLog,
+
+          // The Firestore payload uses serverTimestamp() for trusted audit time.
+          // The optimistic row uses a real local Date so the UI can format it
+          // immediately while Firestore confirms the write.
+          timestamp:
+            new Date()
         };
 
         setLogs(
@@ -1388,22 +1538,85 @@ const App: React.FC = () => {
           ]
         );
 
-        try {
-          await db
-            .collection(
-              'logs'
-            )
-            .add(
-              newLog
-            );
-        } catch (error) {
-          console.error(
-            'Failed to persist log',
-            error
-          );
+        // Use one deterministic document id for all retry attempts. This keeps
+        // the audit write idempotent: if the first request reached Firestore but
+        // its acknowledgement was interrupted, a retry updates the same log
+        // document instead of creating a duplicate audit row.
+        const logDocumentId =
+          'log_' +
+          Date.now().toString(36) +
+          '_' +
+          Math.random()
+            .toString(36)
+            .slice(2, 9);
 
-          throw error;
+        let lastError:
+          unknown = null;
+
+        for (
+          let attempt = 0;
+          attempt < 3;
+          attempt += 1
+        ) {
+          try {
+            await db
+              .collection(
+                'logs'
+              )
+              .doc(
+                logDocumentId
+              )
+              .set(
+                newLog
+              );
+
+            return;
+          } catch (error) {
+            lastError = error;
+
+            // A permission problem will not be fixed by retrying. Network-like
+            // failures get two short retries so a successful inventory action
+            // is much less likely to lose its audit entry.
+            if (
+              isPermissionDenied(
+                error
+              ) ||
+              attempt === 2
+            ) {
+              break;
+            }
+
+            await new Promise(
+              resolve =>
+                window.setTimeout(
+                  resolve,
+                  250 *
+                    Math.pow(
+                      2,
+                      attempt
+                    )
+                )
+            );
+          }
         }
+
+        // Do not leave a local-only audit row that was never accepted by
+        // Firestore. The caller logs the real failure for diagnosis.
+        setLogs(
+          prev =>
+            prev.filter(
+              log =>
+                log.id !==
+                localLogId
+            )
+        );
+
+        console.error(
+          'Failed to persist log',
+          lastError
+        );
+
+        throw lastError;
       },
       [
         currentStaff,
@@ -1716,7 +1929,8 @@ const App: React.FC = () => {
               'تعديل',
               dataToUpdate.name,
               changeDetails,
-              targetCategory
+              targetCategory,
+              dataToUpdate.hiddenForStaff === true
             ).catch(
               error =>
                 console.error(
@@ -1856,7 +2070,8 @@ const App: React.FC = () => {
               'إضافة',
               tileData.name,
               `إضافة صنف جديد بالكمية: ${tileData.meters}`,
-              targetCategory
+              targetCategory,
+              tileData.hiddenForStaff === true
             ).catch(
               error =>
                 console.error(
@@ -2158,7 +2373,8 @@ const App: React.FC = () => {
             'حجز',
             reservingTile.name,
             `تم تحديث الحجوزات. عدد الحجوزات: ${updatedReservations.length}`,
-            targetCategory
+            targetCategory,
+            reservingTile.hiddenForStaff === true
           ).catch(
             error =>
               console.error(
@@ -2264,6 +2480,7 @@ const App: React.FC = () => {
               itemToDelete.name,
               'تم حذف الصنف نهائياً من النظام',
               targetCategory,
+              itemToDelete.hiddenForStaff === true,
             ).catch(error =>
               console.error('Audit log failed', error),
             );
@@ -2357,6 +2574,14 @@ const App: React.FC = () => {
         setIsAddingNew(
           false
         );
+
+        // Opening the general audit-log page from navigation must never keep a
+        // model-specific filter from an earlier visit. Item-specific log viewing
+        // uses handleViewModelLogs(), which sets the filter and opens the page
+        // directly without going through changeView().
+        if (newView === 'logs') {
+          setSelectedModelForLogs(null);
+        }
 
         if (
           newView ===
@@ -2596,7 +2821,7 @@ const App: React.FC = () => {
     // splash is already visible before the JavaScript bundle finishes loading.
     return (
       <div
-        className="app-viewport relative flex items-center justify-center overflow-hidden bg-[linear-gradient(145deg,#0f172a_0%,#172554_45%,#3730a3_100%)] px-6 text-white"
+        className="app-viewport relative flex items-center justify-center overflow-hidden bg-[linear-gradient(145deg,#0f172a_0%,#172554_46%,#3730a3_84%,#3730a3_100%)] px-6 text-white"
         dir="rtl"
         role="status"
         aria-live="polite"
@@ -2627,6 +2852,19 @@ const App: React.FC = () => {
               />
             ))}
           </div>
+        </div>
+
+        <div
+          className="absolute left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5 text-[10px] font-bold text-slate-200/70"
+          style={{ bottom: 'max(26px, calc(env(safe-area-inset-bottom) + 14px))' }}
+          aria-label="من إعداد شركة Dollarix Studio"
+        >
+          <span>من إعداد شركة</span>
+          <img
+            src="/branding/dollarix-studio.png?v=white-logo"
+            alt="Dollarix Studio"
+            className="h-auto w-[138px] object-contain"
+          />
         </div>
       </div>
     );
@@ -3792,3 +4030,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+

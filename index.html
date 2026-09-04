@@ -79,8 +79,7 @@
         padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
         background:
           radial-gradient(circle at 82% 12%, rgba(96, 165, 250, 0.22), transparent 34%),
-          radial-gradient(circle at 10% 88%, rgba(167, 139, 250, 0.20), transparent 36%),
-          linear-gradient(145deg, #0f172a 0%, #172554 46%, #3730a3 100%);
+          linear-gradient(145deg, #0f172a 0%, #172554 46%, #3730a3 84%, #3730a3 100%);
         color: #fff;
         opacity: 1;
         visibility: visible;
@@ -149,6 +148,36 @@
       }
       .app-launch-splash__glyph:nth-child(2) { animation-delay: 140ms; }
       .app-launch-splash__glyph:nth-child(3) { animation-delay: 280ms; }
+
+      .app-launch-splash__credit {
+        position: absolute;
+        left: 50%;
+        bottom: max(26px, calc(env(safe-area-inset-bottom) + 14px));
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 7px;
+        color: rgba(241,245,249,0.82);
+        font-size: 10.5px;
+        font-weight: 700;
+        line-height: 1;
+        white-space: nowrap;
+      }
+      .app-launch-splash__credit-logo {
+        display: block;
+        width: 138px;
+        height: auto;
+        opacity: 1;
+        filter: brightness(1.8) contrast(0.9) saturate(1.05) drop-shadow(0 5px 12px rgba(0,0,0,0.22));
+      }
+      @media (max-height: 650px) {
+        .app-launch-splash__credit {
+          bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px));
+        }
+        .app-launch-splash__credit-logo { width: 122px; }
+      }
+
       @keyframes app-launch-glyph {
         0%, 100% { opacity: 0.38; transform: translateY(0) scale(0.96); }
         50% { opacity: 0.90; transform: translateY(-2px) scale(1); }
@@ -255,6 +284,11 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           </span>
         </div>
+      </div>
+
+      <div class="app-launch-splash__credit" aria-label="من إعداد شركة Dollarix Studio">
+        <span>من إعداد شركة</span>
+        <img class="app-launch-splash__credit-logo" src="/branding/dollarix-studio.png?v=white-logo" alt="Dollarix Studio" />
       </div>
     </div>
     <div id="root"></div>

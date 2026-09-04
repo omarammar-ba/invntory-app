@@ -12,6 +12,8 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
+  where,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -120,6 +122,16 @@ beforeEach(async () => {
       meters: 1,
     });
 
+    await setDoc(doc(db, 'tiles', 'admin-only-tile'), {
+      id: 'admin-only-tile',
+      categoryId: 'tiles',
+      name: 'صنف مدير فقط',
+      meters: 3,
+      boxes: 1,
+      hiddenForStaff: true,
+      reservations: [],
+    });
+
     await setDoc(doc(db, 'logs', 'legacy-log'), {
       action: 'تعديل',
       details: 'سجل قديم بدون قسم',
@@ -144,6 +156,45 @@ test('active admin can read legacy porcelain data', async () => {
 test('active employee can read a visible legacy porcelain category', async () => {
   const db = testEnv.authenticatedContext('employee-1').firestore();
   await assertSucceeds(getDocs(collection(db, 'tiles')));
+});
+
+test('employee category reads are restricted to categories visible to employees', async () => {
+  const db = testEnv.authenticatedContext('employee-1').firestore();
+
+  await assertSucceeds(getDoc(doc(db, 'categories', 'tiles')));
+  await assertFails(getDoc(doc(db, 'categories', 'private')));
+
+  await assertSucceeds(
+    getDocs(
+      query(
+        collection(db, 'categories'),
+        where('visibleToEmployees', '==', true),
+      ),
+    ),
+  );
+});
+
+
+test('employee cannot expose or edit a category that is hidden by the admin', async () => {
+  const db = testEnv.authenticatedContext('employee-1').firestore();
+
+  await assertFails(
+    updateDoc(doc(db, 'categories', 'private'), {
+      visibleToEmployees: true,
+      hiddenForStaff: false,
+    }),
+  );
+});
+
+test('employee cannot hide a visible category from other employees', async () => {
+  const db = testEnv.authenticatedContext('employee-1').firestore();
+
+  await assertFails(
+    updateDoc(doc(db, 'categories', 'tiles'), {
+      visibleToEmployees: false,
+      hiddenForStaff: true,
+    }),
+  );
 });
 
 test('employee cannot read an inventory item whose category is hidden', async () => {
@@ -201,6 +252,36 @@ test('employee can create a visible item with creation audit only', async () => 
       createdByUid: 'admin-1',
     }),
   );
+});
+
+test('employee cannot create, edit or delete an admin-only item', async () => {
+  const db = testEnv.authenticatedContext('employee-1').firestore();
+
+  await assertFails(
+    setDoc(doc(db, 'tiles', 'employee-hidden'), {
+      id: 'employee-hidden',
+      categoryId: 'tiles',
+      name: 'مخفي',
+      meters: 5,
+      boxes: 2,
+      hiddenForStaff: true,
+      createdAt: serverTimestamp(),
+      createdBy: 'أحمد',
+      createdByUid: 'employee-1',
+    }),
+  );
+
+  await assertFails(
+    updateDoc(doc(db, 'tiles', 'admin-only-tile'), {
+      meters: 4,
+      hiddenForStaff: false,
+      updatedAt: serverTimestamp(),
+      updatedBy: 'أحمد',
+      updatedByUid: 'employee-1',
+    }),
+  );
+
+  await assertFails(deleteDoc(doc(db, 'tiles', 'admin-only-tile')));
 });
 
 test('admin can restore a legacy backup item without fabricated audit metadata', async () => {
@@ -430,6 +511,57 @@ test('log creation is bound to authenticated UID, staff name and server time', a
       tileName: 'قديم',
       details: 'تزوير',
       categoryId: 'tiles',
+    }),
+  );
+});
+
+test('employee cannot create an audit log for a hidden category', async () => {
+  const db = testEnv.authenticatedContext('employee-1').firestore();
+
+  await assertFails(
+    setDoc(doc(db, 'logs', 'hidden-category-log'), {
+      actorUid: 'employee-1',
+      user: 'أحمد',
+      timestamp: serverTimestamp(),
+      action: 'إضافة',
+      tileName: 'غير مسموح',
+      details: 'اختبار قسم مخفي',
+      categoryId: 'private',
+    }),
+  );
+});
+
+test('employee cannot mark an audit log as admin-only data', async () => {
+  const db = testEnv.authenticatedContext('employee-1').firestore();
+
+  await assertFails(
+    setDoc(doc(db, 'logs', 'hidden-item-log'), {
+      actorUid: 'employee-1',
+      user: 'أحمد',
+      timestamp: serverTimestamp(),
+      action: 'تعديل',
+      tileName: 'قديم',
+      details: 'اختبار',
+      categoryId: 'tiles',
+      hiddenForStaff: true,
+    }),
+  );
+});
+
+
+test('admin may create a hidden-item audit log while employees cannot', async () => {
+  const adminDb = testEnv.authenticatedContext('admin-1').firestore();
+
+  await assertSucceeds(
+    setDoc(doc(adminDb, 'logs', 'admin-hidden-item-log'), {
+      actorUid: 'admin-1',
+      user: 'عمر',
+      timestamp: serverTimestamp(),
+      action: 'إضافة',
+      tileName: 'صنف مدير فقط',
+      details: 'اختبار',
+      categoryId: 'tiles',
+      hiddenForStaff: true,
     }),
   );
 });

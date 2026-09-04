@@ -46,33 +46,6 @@ service cloud.firestore {
       return isAdmin() || (isEmployee() && categoryVisibleToEmployee(categoryId));
     }
 
-    function categoryIsHidden(data) {
-      return (('hiddenForStaff' in data) && data.hiddenForStaff == true)
-        || (('visibleToEmployees' in data) && data.visibleToEmployees == false);
-    }
-
-    function employeeCreatesVisibleCategory() {
-      return isEmployee() && !categoryIsHidden(request.resource.data);
-    }
-
-    function employeePreservesCategoryVisibility() {
-      return isEmployee()
-        && categoryIsHidden(request.resource.data) == categoryIsHidden(resource.data);
-    }
-
-    function itemIsHiddenForStaff(data) {
-      return ('hiddenForStaff' in data) && data.hiddenForStaff == true;
-    }
-
-    function employeeCreatesVisibleItem() {
-      return !isEmployee() || !itemIsHiddenForStaff(request.resource.data);
-    }
-
-    function employeePreservesItemVisibility() {
-      return !isEmployee()
-        || itemIsHiddenForStaff(request.resource.data) == itemIsHiddenForStaff(resource.data);
-    }
-
     function validUpdateAudit(data) {
       return data.updatedByUid == request.auth.uid
         && data.updatedBy == staffData().name
@@ -93,6 +66,31 @@ service cloud.firestore {
       ]);
     }
 
+    function employeeCanCreateCategoryData(data) {
+      return data.visibleToEmployees == true
+        && (!('hiddenForStaff' in data) || data.hiddenForStaff == false);
+    }
+
+    function employeeCanUpdateVisibleCategory() {
+      return resource.data.visibleToEmployees == true
+        && request.resource.data.visibleToEmployees == true
+        && (!('hiddenForStaff' in resource.data) || resource.data.hiddenForStaff == false)
+        && (!('hiddenForStaff' in request.resource.data) || request.resource.data.hiddenForStaff == false);
+    }
+
+    // Employees can work only with items that are not marked admin-only.  Old
+    // documents may not have hiddenForStaff, so false/missing are both treated
+    // as visible.  This also lets an employee edit a legacy visible document and
+    // normalize the missing flag to false without granting the ability to hide it.
+    function employeeCanCreateVisibleItem(data) {
+      return !('hiddenForStaff' in data) || data.hiddenForStaff == false;
+    }
+
+    function employeeCanMutateVisibleItem() {
+      return (!('hiddenForStaff' in resource.data) || resource.data.hiddenForStaff == false)
+        && (!('hiddenForStaff' in request.resource.data) || request.resource.data.hiddenForStaff == false);
+    }
+
     function validNewStaff(staffId) {
       return request.resource.data.id == staffId
         && request.resource.data.name is string
@@ -109,14 +107,43 @@ service cloud.firestore {
     }
 
     match /categories/{categoryId} {
-      // Both active roles may manage category metadata. Inventory visibility for
-      // employees is still enforced separately by canAccessCategory().
-      allow get, list: if isActiveStaff();
-      allow create: if isAdmin() || employeeCreatesVisibleCategory();
-      allow update: if isAdmin() || employeePreservesCategoryVisibility();
-      allow delete: if isActiveStaff()
-        && categoryId != 'tiles'
-        && categoryId != 'ceramics';
+      // Admin sees every category. Employees can only read categories that are
+      // actually visible to them; the client uses the matching Firestore query.
+      allow get, list: if isAdmin()
+        || (
+          isEmployee()
+          && resource.data.visibleToEmployees == true
+        );
+
+      // Employees may still manage the metadata of visible categories, but the
+      // visibility controls themselves remain admin-only.
+      allow create: if request.resource.data.id == categoryId
+        && (
+          isAdmin()
+          || (
+            isEmployee()
+            && employeeCanCreateCategoryData(request.resource.data)
+          )
+        );
+
+      allow update: if request.resource.data.id == categoryId
+        && (
+          isAdmin()
+          || (
+            isEmployee()
+            && employeeCanUpdateVisibleCategory()
+          )
+        );
+
+      allow delete: if categoryId != 'tiles'
+        && categoryId != 'ceramics'
+        && (
+          isAdmin()
+          || (
+            isEmployee()
+            && resource.data.visibleToEmployees == true
+          )
+        );
     }
 
     // Legacy porcelain collection. Existing documents may not have categoryId/audit fields.
@@ -128,19 +155,22 @@ service cloud.firestore {
       allow create: if request.resource.data.categoryId == 'tiles'
         && (
           isAdmin()
-          || (isEmployee()
+          || (
+            isEmployee()
             && categoryVisibleToEmployee('tiles')
             && validCreateAudit(request.resource.data)
-            && employeeCreatesVisibleItem())
+            && employeeCanCreateVisibleItem(request.resource.data)
+          )
         );
 
       allow update: if canAccessCategory('tiles')
         && validUpdateAudit(request.resource.data)
         && preservesCreationAudit()
-        && employeePreservesItemVisibility()
-        && (!('categoryId' in request.resource.data) || request.resource.data.categoryId == 'tiles');
+        && (!('categoryId' in request.resource.data) || request.resource.data.categoryId == 'tiles')
+        && (isAdmin() || employeeCanMutateVisibleItem());
 
-      allow delete: if canAccessCategory('tiles');
+      allow delete: if canAccessCategory('tiles')
+        && (isAdmin() || (!('hiddenForStaff' in resource.data) || resource.data.hiddenForStaff == false));
     }
 
     // Legacy ceramic collection. Existing documents may not have categoryId/audit fields.
@@ -150,19 +180,22 @@ service cloud.firestore {
       allow create: if request.resource.data.categoryId == 'ceramics'
         && (
           isAdmin()
-          || (isEmployee()
+          || (
+            isEmployee()
             && categoryVisibleToEmployee('ceramics')
             && validCreateAudit(request.resource.data)
-            && employeeCreatesVisibleItem())
+            && employeeCanCreateVisibleItem(request.resource.data)
+          )
         );
 
       allow update: if canAccessCategory('ceramics')
         && validUpdateAudit(request.resource.data)
         && preservesCreationAudit()
-        && employeePreservesItemVisibility()
-        && (!('categoryId' in request.resource.data) || request.resource.data.categoryId == 'ceramics');
+        && (!('categoryId' in request.resource.data) || request.resource.data.categoryId == 'ceramics')
+        && (isAdmin() || employeeCanMutateVisibleItem());
 
-      allow delete: if canAccessCategory('ceramics');
+      allow delete: if canAccessCategory('ceramics')
+        && (isAdmin() || (!('hiddenForStaff' in resource.data) || resource.data.hiddenForStaff == false));
     }
 
     match /inventory/{itemId} {
@@ -180,7 +213,7 @@ service cloud.firestore {
             isEmployee()
             && categoryVisibleToEmployee(request.resource.data.categoryId)
             && validCreateAudit(request.resource.data)
-            && employeeCreatesVisibleItem()
+            && employeeCanCreateVisibleItem(request.resource.data)
           )
         );
 
@@ -190,10 +223,11 @@ service cloud.firestore {
         && canAccessCategory(resource.data.categoryId)
         && validUpdateAudit(request.resource.data)
         && preservesCreationAudit()
-        && employeePreservesItemVisibility();
+        && (isAdmin() || employeeCanMutateVisibleItem());
 
       allow delete: if resource.data.categoryId is string
-        && canAccessCategory(resource.data.categoryId);
+        && canAccessCategory(resource.data.categoryId)
+        && (isAdmin() || (!('hiddenForStaff' in resource.data) || resource.data.hiddenForStaff == false));
     }
 
     match /staff/{staffId} {
@@ -262,6 +296,12 @@ service cloud.firestore {
         && request.resource.data.tileName is string
         && request.resource.data.details is string
         && request.resource.data.categoryId is string
+        && (!('hiddenForStaff' in request.resource.data) || request.resource.data.hiddenForStaff is bool)
+        && (
+          isAdmin()
+          || !('hiddenForStaff' in request.resource.data)
+          || request.resource.data.hiddenForStaff == false
+        )
         && canAccessCategory(request.resource.data.categoryId);
 
       allow update, delete: if false;

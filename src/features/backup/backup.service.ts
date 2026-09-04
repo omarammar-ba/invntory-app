@@ -1085,7 +1085,12 @@ export const backupService = {
     let itemsAdded = 0;
 
     const isEmployee = actor.userRole === 'employee';
-    const categorySnapshot = await db.collection('categories').get();
+    const categorySnapshot = isEmployee
+      ? await db
+          .collection('categories')
+          .where('visibleToEmployees', '==', true)
+          .get()
+      : await db.collection('categories').get();
 
     let tileDocs: any[] = [];
     let ceramicDocs: any[] = [];
@@ -1215,3 +1220,4 @@ export const backupService = {
     return { added, skippedExisting, categoriesAdded, categoriesMerged, itemsAdded };
   },
 };
+

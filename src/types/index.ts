@@ -129,6 +129,9 @@ export interface LogEntry {
   userEmail?: string;
   categoryId?: string;
   actorUid?: string;
+  // New audit entries carry the item visibility at the time of the action.
+  // Legacy logs may not have this field.
+  hiddenForStaff?: boolean;
 }
 
 export type StaffRole = 'admin' | 'employee';

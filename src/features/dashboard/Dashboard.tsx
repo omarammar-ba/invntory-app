@@ -701,48 +701,6 @@ const Dashboard: React.FC<
                   0,
                 );
 
-              const lowCount =
-                categoryItems.filter(
-                  item => {
-                    const qty =
-                      Number(
-                        item.meters,
-                      ) || 0;
-
-                    const alertLimit =
-                      (item as any)
-                        .lowStockAlert !==
-                      undefined
-                        ? Number(
-                            (
-                              item as any
-                            )
-                              .lowStockAlert,
-                          )
-                        : 10;
-
-                    return (
-                      qty > 0 &&
-                      qty <=
-                        alertLimit
-                    );
-                  },
-                ).length;
-
-              const reservationCount =
-                categoryItems.reduce(
-                  (
-                    sum,
-                    item,
-                  ) =>
-                    sum +
-                    (item
-                      .reservations
-                      ?.length ||
-                      0),
-                  0,
-                );
-
               return (
                 <motion.button
                   layout
@@ -825,30 +783,36 @@ const Dashboard: React.FC<
                       }
                     </p>
 
-                    <p
+                  </div>
+
+                  <div
+                    className="
+                      shrink-0
+                      text-left
+                      leading-tight
+                    "
+                  >
+                    <div
                       className="
-                        mt-1
                         text-[10px]
-                        font-semibold
-                        text-slate-500
-                        dark:text-slate-400
+                        font-extrabold
+                        text-slate-700
+                        dark:text-slate-200
                       "
                     >
-                      {
-                        categoryItems.length
-                      }{' '}
+                      {categoryItems.length}{' '}
                       صنف
+                    </div>
 
-                      <span
-                        className="
-                          mx-1
-                          text-slate-300
-                          dark:text-neutral-700
-                        "
-                      >
-                        •
-                      </span>
-
+                    <div
+                      className="
+                        mt-0.5
+                        text-[9px]
+                        font-semibold
+                        text-slate-400
+                        dark:text-slate-500
+                      "
+                    >
                       {totalQty.toLocaleString(
                         'en-US',
                         {
@@ -861,69 +825,7 @@ const Dashboard: React.FC<
                       {isPieceUnit
                         ? 'قطعة'
                         : 'م²'}
-                    </p>
-                  </div>
-
-                  <div
-                    className="
-                      shrink-0
-                      text-left
-                    "
-                  >
-                    {lowCount > 0 ? (
-                      <span
-                        className="
-                          rounded-full
-                          bg-rose-50
-                          px-2
-                          py-1
-                          text-[9px]
-                          font-bold
-                          text-rose-600
-                          dark:bg-rose-900/25
-                          dark:text-rose-400
-                        "
-                      >
-                        {lowCount}{' '}
-                        منخفض
-                      </span>
-                    ) : reservationCount >
-                      0 ? (
-                      <span
-                        className="
-                          rounded-full
-                          bg-blue-50
-                          px-2
-                          py-1
-                          text-[9px]
-                          font-bold
-                          text-blue-600
-                          dark:bg-blue-900/25
-                          dark:text-blue-400
-                        "
-                      >
-                        {
-                          reservationCount
-                        }{' '}
-                        محجوز
-                      </span>
-                    ) : (
-                      <span
-                        className="
-                          rounded-full
-                          bg-emerald-50
-                          px-2
-                          py-1
-                          text-[9px]
-                          font-bold
-                          text-emerald-600
-                          dark:bg-emerald-900/25
-                          dark:text-emerald-400
-                        "
-                      >
-                        سليم
-                      </span>
-                    )}
+                    </div>
                   </div>
                 </motion.button>
               );

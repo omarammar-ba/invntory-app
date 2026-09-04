@@ -143,6 +143,17 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               )}
             </button>
           </form>
+
+          <div className="mt-6 border-t border-slate-100 pt-4 text-center dark:border-white/[0.06]">
+            <p className="mb-2 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+              من إعداد شركة
+            </p>
+            <img
+              src="/branding/dollarix-studio.png"
+              alt="Dollarix Studio"
+              className="mx-auto h-auto w-[118px] object-contain opacity-90 dark:opacity-95"
+            />
+          </div>
         </div>
       </div>
     </div>
