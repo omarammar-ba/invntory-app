@@ -149,7 +149,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               من إعداد شركة
             </p>
             <img
-              src="/branding/dollarix-studio.png"
+              src="/branding/dollarix-studio-color.png"
               alt="Dollarix Studio"
               className="mx-auto h-auto w-[118px] object-contain opacity-90 dark:opacity-95"
             />

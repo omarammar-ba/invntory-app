@@ -8,6 +8,9 @@ export interface CustomFieldOption {
   id: string;
   label: string;
   value: string;
+  // إذا كان الحقل تابعاً لحقل اختيارات آخر، يمكن ربط الخيار بقيمة الأب.
+  // عدم وجود القيمة يعني أن الخيار متاح لكل قيم الحقل الأب.
+  parentValue?: string;
 }
 
 export interface CustomCategoryField {
@@ -21,6 +24,8 @@ export interface CustomCategoryField {
   placeholder?: string;
   // فقط للـselect
   options?: CustomFieldOption[];
+  // حقل اختيارات آخر تعتمد عليه هذه القائمة (اختياري).
+  dependsOnFieldId?: string;
   // فقط للـfixed
   fixedValue?: string;
   // هل يدخل هذا الحقل في الاسم التلقائي للصنف؟

@@ -196,6 +196,37 @@ const FIELD_TYPES: {
   },
 ];
 
+
+const EMPTY_CUSTOM_FIELD_OPTIONS: CustomFieldOption[] = [];
+
+const splitSimpleOptions = (value: string): string[] => {
+  const seen = new Set<string>();
+
+  return value
+    .split(/[،,;\n]+/)
+    .map(item => item.trim())
+    .filter(item => {
+      if (!item) return false;
+      const key = item.toLocaleLowerCase('ar');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+};
+
+const makeSimpleOptions = (
+  parentOptions: CustomFieldOption[],
+  drafts: Record<string, string>,
+): CustomFieldOption[] =>
+  parentOptions.flatMap(parentOption =>
+    splitSimpleOptions(drafts[parentOption.value] || '').map(label => ({
+      id: makeConfigId('opt'),
+      label,
+      value: label,
+      parentValue: parentOption.value,
+    })),
+  );
+
 const CategoryManagerModal:
   React.FC<CategoryManagerModalProps> = ({
     isOpen,
@@ -347,9 +378,24 @@ const CategoryManagerModal:
     >([]);
 
     const [
+      fieldDependsOnId,
+      setFieldDependsOnId,
+    ] = useState('');
+
+    const [
+      newOptionParentValue,
+      setNewOptionParentValue,
+    ] = useState('');
+
+    const [
       newOptionInput,
       setNewOptionInput,
     ] = useState('');
+
+    const [
+      dependentOptionsText,
+      setDependentOptionsText,
+    ] = useState<Record<string, string>>({});
 
     const [
       optionError,
@@ -572,6 +618,71 @@ const CategoryManagerModal:
         editingCatId,
       );
 
+    const editingFieldOrder =
+      editingFieldId
+        ? customFields.find(
+            field => field.id === editingFieldId,
+          )?.order ?? customFields.length
+        : customFields.length;
+
+    const dependencyParentCandidates =
+      customFields.filter(
+        field =>
+          field.id !== editingFieldId &&
+          field.type === 'select' &&
+          ((field.order ?? 0) < editingFieldOrder || field.id === fieldDependsOnId),
+      );
+
+    const selectedDependencyParent =
+      dependencyParentCandidates.find(
+        field => field.id === fieldDependsOnId,
+      );
+
+    const dependencyParentOptions =
+      selectedDependencyParent?.options || EMPTY_CUSTOM_FIELD_OPTIONS;
+
+    React.useEffect(() => {
+      if (!fieldDependsOnId) {
+        setDependentOptionsText({});
+        return;
+      }
+
+      setDependentOptionsText(previous => {
+        const next: Record<string, string> = {};
+        const allLabels = Array.from(
+          new Set(fieldOptionsList.map(option => option.label.trim()).filter(Boolean)),
+        );
+        const sharedLabels = fieldOptionsList
+          .filter(option => !option.parentValue)
+          .map(option => option.label.trim())
+          .filter(Boolean);
+
+        dependencyParentOptions.forEach(parentOption => {
+          if (Object.prototype.hasOwnProperty.call(previous, parentOption.value)) {
+            next[parentOption.value] = previous[parentOption.value];
+            return;
+          }
+
+          const scopedLabels = fieldOptionsList
+            .filter(option => option.parentValue === parentOption.value)
+            .map(option => option.label.trim())
+            .filter(Boolean);
+
+          const seed = Array.from(
+            new Set(
+              scopedLabels.length > 0 || sharedLabels.length > 0
+                ? [...sharedLabels, ...scopedLabels]
+                : allLabels,
+            ),
+          );
+
+          next[parentOption.value] = seed.join('، ');
+        });
+
+        return next;
+      });
+    }, [fieldDependsOnId, dependencyParentOptions, fieldOptionsList]);
+
     React.useEffect(() => {
       if (
         !editingFieldId ||
@@ -627,9 +738,19 @@ const CategoryManagerModal:
           [],
         );
 
+        setFieldDependsOnId(
+          '',
+        );
+
+        setNewOptionParentValue(
+          '',
+        );
+
         setNewOptionInput(
           '',
         );
+
+        setDependentOptionsText({});
 
         setOptionError(null);
 
@@ -688,9 +809,19 @@ const CategoryManagerModal:
             : [],
         );
 
+        setFieldDependsOnId(
+          field.dependsOnFieldId || '',
+        );
+
+        setNewOptionParentValue(
+          '',
+        );
+
         setNewOptionInput(
           '',
         );
+
+        setDependentOptionsText({});
 
         setOptionError(null);
 
@@ -709,6 +840,9 @@ const CategoryManagerModal:
           null,
         );
 
+        setFieldDependsOnId('');
+        setNewOptionParentValue('');
+        setDependentOptionsText({});
         setOptionError(null);
       };
 
@@ -725,18 +859,31 @@ const CategoryManagerModal:
           return;
         }
 
+        const scopedParentValue =
+          fieldDependsOnId
+            ? newOptionParentValue
+            : '';
+
         const exists =
           fieldOptionsList.some(
-            option =>
-              option.value.toLowerCase() ===
-                val.toLowerCase() ||
-              option.label.toLowerCase() ===
-                val.toLowerCase(),
+            option => {
+              const sameText =
+                option.value.toLowerCase() === val.toLowerCase() ||
+                option.label.toLowerCase() === val.toLowerCase();
+
+              if (!sameText) return false;
+              if (!fieldDependsOnId) return true;
+
+              const existingScope = option.parentValue || '';
+              if (!existingScope || !scopedParentValue) return true;
+
+              return existingScope === scopedParentValue;
+            },
           );
 
         if (exists) {
           setOptionError(
-            'هذا الخيار موجود مسبقاً.',
+            'هذا الخيار موجود مسبقاً لنفس الحالة.',
           );
 
           return;
@@ -753,6 +900,10 @@ const CategoryManagerModal:
 
               label: val,
               value: val,
+              parentValue:
+                fieldDependsOnId && scopedParentValue
+                  ? scopedParentValue
+                  : undefined,
             },
           ],
         );
@@ -776,6 +927,43 @@ const CategoryManagerModal:
                 optionId,
             ),
         );
+      };
+
+    const handleOptionParentValueChange =
+      (optionId: string, nextParentValue: string) => {
+        const target = fieldOptionsList.find(option => option.id === optionId);
+        if (!target) return;
+
+        const conflict = fieldOptionsList.some(option => {
+          if (option.id === optionId) return false;
+
+          const sameText =
+            option.value.toLowerCase() === target.value.toLowerCase() ||
+            option.label.toLowerCase() === target.label.toLowerCase();
+
+          if (!sameText) return false;
+
+          const existingScope = option.parentValue || '';
+          if (!existingScope || !nextParentValue) return true;
+          return existingScope === nextParentValue;
+        });
+
+        if (conflict) {
+          setOptionError('نفس الخيار موجود مسبقاً لهذه الحالة.');
+          return;
+        }
+
+        setFieldOptionsList(previous =>
+          previous.map(option =>
+            option.id === optionId
+              ? {
+                  ...option,
+                  parentValue: nextParentValue || undefined,
+                }
+              : option,
+          ),
+        );
+        setOptionError(null);
       };
 
     const handleMoveOption =
@@ -831,10 +1019,20 @@ const CategoryManagerModal:
           return;
         }
 
+        const effectiveOptions =
+          fieldType === 'select'
+            ? fieldDependsOnId
+              ? makeSimpleOptions(
+                  dependencyParentOptions,
+                  dependentOptionsText,
+                )
+              : fieldOptionsList
+            : [];
+
         if (
           fieldType ===
             'select' &&
-          fieldOptionsList.length ===
+          effectiveOptions.length ===
             0
         ) {
           setOptionError(
@@ -894,7 +1092,20 @@ const CategoryManagerModal:
           options:
             fieldType ===
             'select'
-              ? fieldOptionsList
+              ? effectiveOptions.map(option => ({
+                  id: option.id,
+                  label: option.label,
+                  value: option.value,
+                  parentValue:
+                    fieldDependsOnId && option.parentValue
+                      ? option.parentValue
+                      : undefined,
+                }))
+              : undefined,
+
+          dependsOnFieldId:
+            fieldType === 'select' && fieldDependsOnId
+              ? fieldDependsOnId
               : undefined,
 
           fixedValue:
@@ -923,14 +1134,34 @@ const CategoryManagerModal:
           editingFieldId
         ) {
           setCustomFields(
-            previous =>
-              previous.map(
+            previous => {
+              const updated = previous.map(
                 field =>
-                  field.id ===
-                  editingFieldId
+                  field.id === editingFieldId
                     ? fieldData
                     : field,
-              ),
+              );
+
+              if (fieldData.type === 'select') {
+                return updated;
+              }
+
+              return updated.map(field => {
+                if (field.dependsOnFieldId !== editingFieldId) {
+                  return field;
+                }
+
+                return {
+                  ...field,
+                  dependsOnFieldId: undefined,
+                  options: field.options?.map(option => ({
+                    id: option.id,
+                    label: option.label,
+                    value: option.value,
+                  })),
+                };
+              });
+            },
           );
         } else {
           setCustomFields(
@@ -1039,6 +1270,16 @@ const CategoryManagerModal:
               ) => ({
                 ...field,
                 order: index,
+                ...(field.dependsOnFieldId === fieldId
+                  ? {
+                      dependsOnFieldId: undefined,
+                      options: field.options?.map(option => ({
+                        id: option.id,
+                        label: option.label,
+                        value: option.value,
+                      })),
+                    }
+                  : {}),
               }),
             );
 
@@ -1108,7 +1349,20 @@ const CategoryManagerModal:
               options:
                 field.type ===
                 'select'
-                  ? field.options
+                  ? field.options?.map(option => ({
+                      id: option.id,
+                      label: option.label,
+                      value: option.value,
+                      parentValue:
+                        field.dependsOnFieldId && option.parentValue
+                          ? option.parentValue
+                          : undefined,
+                    }))
+                  : undefined,
+
+              dependsOnFieldId:
+                field.type === 'select' && field.dependsOnFieldId
+                  ? field.dependsOnFieldId
                   : undefined,
 
               fixedValue:
@@ -2519,6 +2773,11 @@ const CategoryManagerModal:
                                     type.id,
                                   );
 
+                                  if (type.id !== 'select') {
+                                    setFieldDependsOnId('');
+                                    setNewOptionParentValue('');
+                                  }
+
                                   setOptionError(
                                     null,
                                   );
@@ -2690,6 +2949,75 @@ const CategoryManagerModal:
                           dark:bg-neutral-800
                         "
                       >
+                        {dependencyParentCandidates.length > 0 && (
+                          <div>
+                            <label
+                              className="
+                                mb-1
+                                block
+                                text-[11px]
+                                font-semibold
+                                text-slate-500
+                              "
+                            >
+                              يعتمد على
+                            </label>
+
+                            <select
+                              value={fieldDependsOnId}
+                              onChange={event => {
+                                const nextId = event.target.value;
+
+                                if (nextId !== fieldDependsOnId && fieldDependsOnId) {
+                                  const mergedLabels = Array.from(
+                                    new Set(
+                                      Object.values(dependentOptionsText)
+                                        .flatMap(splitSimpleOptions),
+                                    ),
+                                  );
+
+                                  if (mergedLabels.length > 0) {
+                                    setFieldOptionsList(
+                                      mergedLabels.map(label => ({
+                                        id: makeConfigId('opt'),
+                                        label,
+                                        value: label,
+                                      })),
+                                    );
+                                  }
+                                }
+
+                                setFieldDependsOnId(nextId);
+                                setDependentOptionsText({});
+                                setOptionError(null);
+                              }}
+                              className="
+                                h-10
+                                w-full
+                                rounded-[10px]
+                                border
+                                border-slate-200
+                                bg-white
+                                px-3
+                                text-xs
+                                font-semibold
+                                text-slate-700
+                                outline-none
+                                dark:border-white/[0.08]
+                                dark:bg-neutral-900
+                                dark:text-slate-200
+                              "
+                            >
+                              <option value="">بدون اعتماد</option>
+                              {dependencyParentCandidates.map(parentField => (
+                                <option key={parentField.id} value={parentField.id}>
+                                  {parentField.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
                         <span
                           className="
                             block
@@ -2702,236 +3030,167 @@ const CategoryManagerModal:
                           خيارات القائمة
                         </span>
 
-                        <div
-                          className="
-                            flex
-                            gap-2
-                          "
-                        >
-                          <input
-                            type="text"
-                            value={
-                              newOptionInput
-                            }
-                            onChange={
-                              event =>
-                                setNewOptionInput(
-                                  event.target.value,
-                                )
-                            }
-                            onKeyDown={
-                              event => {
-                                if (
-                                  event.key ===
-                                  'Enter'
-                                ) {
-                                  event.preventDefault();
+                        {fieldDependsOnId ? (
+                          <div className="space-y-2.5">
+                            <p className="text-[9px] font-medium leading-relaxed text-slate-400">
+                              اكتب خيارات كل قيمة وافصل بينها بفاصلة.
+                            </p>
 
-                                  handleAddOption();
+                            {dependencyParentOptions.map(parentOption => (
+                              <div key={parentOption.id}>
+                                <label className="mb-1 block text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                                  {parentOption.label}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={dependentOptionsText[parentOption.value] || ''}
+                                  onChange={event =>
+                                    setDependentOptionsText(previous => ({
+                                      ...previous,
+                                      [parentOption.value]: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="مثال: 80، 90، 100"
+                                  className="
+                                    h-10
+                                    w-full
+                                    rounded-[10px]
+                                    border
+                                    border-slate-200
+                                    bg-white
+                                    px-3
+                                    text-xs
+                                    font-semibold
+                                    outline-none
+                                    dark:border-white/[0.08]
+                                    dark:bg-neutral-900
+                                  "
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <>
+                            <div
+                              className="
+                                flex
+                                flex-wrap
+                                gap-2
+                              "
+                            >
+                              <input
+                                type="text"
+                                value={newOptionInput}
+                                onChange={event =>
+                                  setNewOptionInput(event.target.value)
                                 }
-                              }
-                            }
-                            placeholder="اكتب الخيار..."
-                            className="
-                              h-10
-                              min-w-0
-                              flex-1
-                              rounded-[10px]
-                              border
-                              border-slate-200
-                              bg-white
-                              px-3
-                              text-xs
-                              font-semibold
-                              outline-none
-                              dark:border-white/[0.08]
-                              dark:bg-neutral-900
-                            "
-                          />
-
-                          <button
-                            type="button"
-                            onClick={
-                              handleAddOption
-                            }
-                            className="
-                              h-10
-                              shrink-0
-                              rounded-[10px]
-                              bg-slate-900
-                              px-3
-                              text-[11px]
-                              font-bold
-                              text-white
-                              dark:bg-white
-                              dark:text-slate-900
-                            "
-                          >
-                            إضافة
-                          </button>
-                        </div>
-
-                        {optionError && (
-                          <p
-                            className="
-                              text-[10px]
-                              font-semibold
-                              text-rose-500
-                            "
-                          >
-                            {
-                              optionError
-                            }
-                          </p>
-                        )}
-
-                        <div
-                          className="
-                            space-y-1.5
-                          "
-                        >
-                          {fieldOptionsList.map(
-                            (
-                              option,
-                              index,
-                            ) => (
-                              <div
-                                key={
-                                  option.id
-                                }
+                                onKeyDown={event => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    handleAddOption();
+                                  }
+                                }}
+                                placeholder="اكتب الخيار..."
                                 className="
-                                  flex
-                                  min-h-9
-                                  items-center
-                                  justify-between
-                                  gap-2
+                                  h-10
+                                  min-w-0
+                                  flex-1
                                   rounded-[10px]
                                   border
                                   border-slate-200
                                   bg-white
-                                  px-2.5
-                                  dark:border-white/[0.06]
+                                  px-3
+                                  text-xs
+                                  font-semibold
+                                  outline-none
+                                  dark:border-white/[0.08]
                                   dark:bg-neutral-900
                                 "
-                              >
-                                <span
-                                  className="
-                                    min-w-0
-                                    flex-1
-                                    break-words
-                                    text-[11px]
-                                    font-semibold
-                                    text-slate-700
-                                    dark:text-slate-300
-                                  "
-                                >
-                                  {
-                                    option.label
-                                  }
-                                </span>
+                              />
 
+                              <button
+                                type="button"
+                                onClick={handleAddOption}
+                                className="
+                                  h-10
+                                  shrink-0
+                                  rounded-[10px]
+                                  bg-slate-900
+                                  px-3
+                                  text-[11px]
+                                  font-bold
+                                  text-white
+                                  dark:bg-white
+                                  dark:text-slate-900
+                                "
+                              >
+                                إضافة
+                              </button>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {fieldOptionsList.map((option, index) => (
                                 <div
+                                  key={option.id}
                                   className="
                                     flex
-                                    shrink-0
+                                    min-h-9
                                     items-center
-                                    gap-0.5
+                                    justify-between
+                                    gap-2
+                                    rounded-[10px]
+                                    border
+                                    border-slate-200
+                                    bg-white
+                                    px-2.5
+                                    dark:border-white/[0.06]
+                                    dark:bg-neutral-900
                                   "
                                 >
-                                  {index >
-                                    0 && (
+                                  <span className="min-w-0 flex-1 break-words text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                    {option.label}
+                                  </span>
+
+                                  <div className="flex shrink-0 items-center gap-0.5">
+                                    {index > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleMoveOption(index, 'up')}
+                                        className="flex h-7 w-7 items-center justify-center rounded-[8px] text-slate-400 hover:bg-slate-100 dark:hover:bg-neutral-800"
+                                      >
+                                        <ArrowUp className="h-3 w-3" />
+                                      </button>
+                                    )}
+
+                                    {index < fieldOptionsList.length - 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleMoveOption(index, 'down')}
+                                        className="flex h-7 w-7 items-center justify-center rounded-[8px] text-slate-400 hover:bg-slate-100 dark:hover:bg-neutral-800"
+                                      >
+                                        <ArrowDown className="h-3 w-3" />
+                                      </button>
+                                    )}
+
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        handleMoveOption(
-                                          index,
-                                          'up',
-                                        )
-                                      }
-                                      className="
-                                        flex
-                                        h-7
-                                        w-7
-                                        items-center
-                                        justify-center
-                                        rounded-[8px]
-                                        text-slate-400
-                                        hover:bg-slate-100
-                                        dark:hover:bg-neutral-800
-                                      "
+                                      onClick={() => handleRemoveOption(option.id)}
+                                      className="flex h-7 w-7 items-center justify-center rounded-[8px] text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                                     >
-                                      <ArrowUp
-                                        className="
-                                          h-3
-                                          w-3
-                                        "
-                                      />
+                                      <CancelIcon className="h-3 w-3" />
                                     </button>
-                                  )}
-
-                                  {index <
-                                    fieldOptionsList.length -
-                                      1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleMoveOption(
-                                          index,
-                                          'down',
-                                        )
-                                      }
-                                      className="
-                                        flex
-                                        h-7
-                                        w-7
-                                        items-center
-                                        justify-center
-                                        rounded-[8px]
-                                        text-slate-400
-                                        hover:bg-slate-100
-                                        dark:hover:bg-neutral-800
-                                      "
-                                    >
-                                      <ArrowDown
-                                        className="
-                                          h-3
-                                          w-3
-                                        "
-                                      />
-                                    </button>
-                                  )}
-
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleRemoveOption(
-                                        option.id,
-                                      )
-                                    }
-                                    className="
-                                      flex
-                                      h-7
-                                      w-7
-                                      items-center
-                                      justify-center
-                                      rounded-[8px]
-                                      text-rose-500
-                                      hover:bg-rose-50
-                                      dark:hover:bg-rose-950/30
-                                    "
-                                  >
-                                    <CancelIcon
-                                      className="
-                                        h-3
-                                        w-3
-                                      "
-                                    />
-                                  </button>
+                                  </div>
                                 </div>
-                              </div>
-                            ),
-                          )}
-                        </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        {optionError && (
+                          <p className="text-[10px] font-semibold text-rose-500">
+                            {optionError}
+                          </p>
+                        )}
                       </div>
                     )}
 

@@ -31,6 +31,97 @@ export const makeConfigId = (prefix: string): string => {
  * Automatically builds an item name by combining the values of custom fields
  * that have `includeInItemName === true`, sorted by field order.
  */
+
+/**
+ * Returns whether a custom field should currently be shown. Dependent fields
+ * stay hidden until their parent has a value. Missing/legacy parent configs are
+ * treated as active so old categories keep working unchanged.
+ */
+export function isCustomFieldActive(
+  field: CustomCategoryField,
+  fields: CustomCategoryField[],
+  values: Record<string, string | number>,
+  visiting: Set<string> = new Set(),
+): boolean {
+  if (!field.dependsOnFieldId) return true;
+
+  if (visiting.has(field.id)) return true;
+  visiting.add(field.id);
+
+  const parent = fields.find(item => item.id === field.dependsOnFieldId);
+  if (!parent) return true;
+
+  if (!isCustomFieldActive(parent, fields, values, visiting)) return false;
+
+  const parentValue = values[parent.id];
+  return parentValue !== undefined && parentValue !== null && String(parentValue).trim() !== '';
+}
+
+/**
+ * Filters a select field's options by the currently selected parent value.
+ * Options without parentValue are treated as shared/global options.
+ */
+export function getAvailableCustomFieldOptions(
+  field: CustomCategoryField,
+  values: Record<string, string | number>,
+): CustomFieldOption[] {
+  const options = Array.isArray(field.options) ? field.options : [];
+  if (!field.dependsOnFieldId) return options;
+
+  const rawParentValue = values[field.dependsOnFieldId];
+  if (rawParentValue === undefined || rawParentValue === null || String(rawParentValue).trim() === '') {
+    return [];
+  }
+
+  const parentValue = String(rawParentValue);
+  return options.filter(option => !option.parentValue || option.parentValue === parentValue);
+}
+
+/**
+ * Clears stale dependent values after a parent changes. This also cascades to
+ * grandchildren, so future sections can use more than one dependency level.
+ */
+export function sanitizeDependentCustomValues(
+  fields: CustomCategoryField[],
+  values: Record<string, string | number>,
+): Record<string, string | number> {
+  const next = { ...values };
+  const ordered = [...fields].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  for (let pass = 0; pass < ordered.length; pass += 1) {
+    let changed = false;
+
+    for (const field of ordered) {
+      if (!field.dependsOnFieldId) continue;
+
+      if (!isCustomFieldActive(field, ordered, next)) {
+        if (field.id in next) {
+          delete next[field.id];
+          changed = true;
+        }
+        continue;
+      }
+
+      if (field.type !== 'select') continue;
+
+      const current = next[field.id];
+      if (current === undefined || current === null || String(current).trim() === '') continue;
+
+      const allowed = getAvailableCustomFieldOptions(field, next);
+      const stillValid = allowed.some(option => option.value === String(current));
+
+      if (!stillValid) {
+        delete next[field.id];
+        changed = true;
+      }
+    }
+
+    if (!changed) break;
+  }
+
+  return next;
+}
+
 export function buildNameFromCustomFields(
   fields: CustomCategoryField[],
   values: Record<string, string | number>
@@ -44,7 +135,7 @@ export function buildNameFromCustomFields(
         (b.order ?? 0)
     )
     .forEach(field => {
-      if (!field.includeInItemName) {
+      if (!field.includeInItemName || !isCustomFieldActive(field, fields, values)) {
         return;
       }
 
@@ -66,8 +157,8 @@ export function buildNameFromCustomFields(
 
       if (field.type === 'select') {
         const option =
-          field.options?.find(
-            (o: any) => o.value === raw || o.label === raw || o.name === raw
+          getAvailableCustomFieldOptions(field, values).find(
+            (o: any) => String(o.value) === String(raw) || String(o.label) === String(raw) || String(o.name || '') === String(raw)
           );
 
         if (option) {
