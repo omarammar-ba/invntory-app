@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="light app-launching">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="إدارة مخزون" />
+    <meta name="application-name" content="إدارة مخزون" />
+    <meta name="description" content="تطبيق إدارة المخزون" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="preload" as="image" href="/icons/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+
+    <title>إدارة مخزون</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root { color-scheme: light; }
+      html.dark { color-scheme: dark; }
+      html {
+        width: 100%;
+        min-height: 100%;
+        background: #f4f7fb;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+      html.dark { background: #0a0a0a; }
+      html.app-launching {
+        background: #3730a3;
+      }
+      body {
+        width: 100%;
+        min-width: 320px;
+        min-height: 100vh;
+        min-height: 100dvh;
+        margin: 0;
+        background: #f4f7fb;
+        color: #1e293b;
+        font-family: "Cairo", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html.dark body { background: #0a0a0a; color: #f8fafc; }
+      html.app-launching body { background: #3730a3; }
+      #root {
+        width: 100%;
+        min-height: 100vh;
+        min-height: 100dvh;
+      }
+
+      #app-launch-splash {
+        position: fixed;
+        inset: 0;
+        box-sizing: border-box;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        min-height: 100vh;
+        min-height: 100dvh;
+        z-index: 2147483000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+        background:
+          radial-gradient(circle at 82% 12%, rgba(96, 165, 250, 0.22), transparent 34%),
+          radial-gradient(circle at 10% 88%, rgba(167, 139, 250, 0.20), transparent 36%),
+          linear-gradient(145deg, #0f172a 0%, #172554 46%, #3730a3 100%);
+        color: #fff;
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 280ms ease, visibility 280ms ease;
+      }
+      #app-launch-splash.app-launch-splash--hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      .app-launch-splash__content {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .app-launch-splash__logo-shell {
+        display: grid;
+        place-items: center;
+        width: 104px;
+        height: 104px;
+        margin-bottom: 20px;
+        border: 1px solid rgba(255,255,255,0.20);
+        border-radius: 30px;
+        background: rgba(255,255,255,0.10);
+        box-shadow: 0 24px 60px rgba(0,0,0,0.24);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+      .app-launch-splash__logo {
+        width: 84px;
+        height: 84px;
+        border-radius: 23px;
+        box-shadow: 0 14px 30px rgba(0,0,0,0.20);
+      }
+      .app-launch-splash__title {
+        margin: 0;
+        font-size: 27px;
+        font-weight: 900;
+        line-height: 1.25;
+        letter-spacing: -0.03em;
+      }
+      .app-launch-splash__subtitle {
+        margin: 7px 0 0;
+        color: rgba(219,234,254,0.78);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .app-launch-splash__glyphs {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 28px;
+      }
+      .app-launch-splash__glyph {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border: 1px solid rgba(255,255,255,0.13);
+        border-radius: 11px;
+        background: rgba(255,255,255,0.08);
+        color: rgba(255,255,255,0.60);
+        animation: app-launch-glyph 1.25s ease-in-out infinite;
+      }
+      .app-launch-splash__glyph:nth-child(2) { animation-delay: 140ms; }
+      .app-launch-splash__glyph:nth-child(3) { animation-delay: 280ms; }
+      @keyframes app-launch-glyph {
+        0%, 100% { opacity: 0.38; transform: translateY(0) scale(0.96); }
+        50% { opacity: 0.90; transform: translateY(-2px) scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-launch-splash { transition: none; }
+        .app-launch-splash__glyph { animation: none; opacity: 0.70; }
+      }
+
+      .print-only-header { display: none !important; }
+
+      @media print {
+        #app-launch-splash { display: none !important; }
+        @page { size: A4 portrait; margin: 0.5cm; }
+        .print-only-header {
+          display: block !important;
+          text-align: center;
+          margin-bottom: 20px;
+          border-bottom: 2px solid #000;
+          padding-bottom: 10px;
+        }
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          box-shadow: none !important;
+          text-shadow: none !important;
+        }
+        .no-print, header, footer, nav, .nav-buttons, .toolbar, .search-bar,
+        .install-prompt, .summary-cards, button, input {
+          display: none !important;
+        }
+        body, html, #root, #print-area {
+          background: white !important;
+          color: black !important;
+          width: 100% !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: visible !important;
+          display: block !important;
+          position: relative !important;
+        }
+        table {
+          width: 100% !important;
+          border-collapse: collapse !important;
+          border: 2px solid black !important;
+          margin-top: 10px !important;
+          font-size: 10pt !important;
+          table-layout: fixed !important;
+        }
+        thead { display: table-header-group !important; }
+        tr { page-break-inside: avoid !important; border-bottom: 1px solid black !important; }
+        th, td {
+          border: 1px solid black !important;
+          padding: 6px 4px !important;
+          text-align: center !important;
+          color: black !important;
+        }
+        th { background: #f0f0f0 !important; padding: 8px 4px !important; font-weight: 900 !important; }
+        td { font-weight: 700 !important; font-size: 10pt !important; }
+        .print\:table-cell { display: table-cell !important; }
+        .print\:hidden { display: none !important; }
+        .print\:block { display: block !important; }
+        .print\:border-none { border: none !important; }
+
+        html.printing-official-report body * {
+          visibility: hidden !important;
+        }
+        html.printing-official-report #official-pdf-report-content,
+        html.printing-official-report #official-pdf-report-content * {
+          visibility: visible !important;
+        }
+        html.printing-official-report #official-pdf-report-content {
+          position: absolute !important;
+          inset: 0 !important;
+          width: 100% !important;
+          max-width: none !important;
+          min-height: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          border: 0 !important;
+          border-radius: 0 !important;
+          background: white !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app-launch-splash" role="status" aria-live="polite" aria-label="جاري تشغيل تطبيق إدارة مخزون">
+      <div class="app-launch-splash__content">
+        <div class="app-launch-splash__logo-shell">
+          <img class="app-launch-splash__logo" src="/icons/icon-192.png" alt="" />
+        </div>
+        <h1 class="app-launch-splash__title">إدارة مخزون</h1>
+        <p class="app-launch-splash__subtitle">مخزونك جاهز بين إيديك</p>
+        <div class="app-launch-splash__glyphs" aria-hidden="true">
+          <span class="app-launch-splash__glyph">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>
+          </span>
+          <span class="app-launch-splash__glyph">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18"/><path d="M3 12h18"/><path d="M3 17h18"/></svg>
+          </span>
+          <span class="app-launch-splash__glyph">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          </span>
+        </div>
+      </div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

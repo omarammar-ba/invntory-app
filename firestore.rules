@@ -1,0 +1,236 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function staffPath(uid) {
+      return /databases/$(database)/documents/staff/$(uid);
+    }
+
+    function hasStaffDoc() {
+      return isSignedIn() && exists(staffPath(request.auth.uid));
+    }
+
+    function staffData() {
+      return get(staffPath(request.auth.uid)).data;
+    }
+
+    function isActiveStaff() {
+      return hasStaffDoc()
+        && staffData().status == 'active'
+        && (staffData().role == 'admin' || staffData().role == 'employee');
+    }
+
+    function isAdmin() {
+      return isActiveStaff() && staffData().role == 'admin';
+    }
+
+    function isEmployee() {
+      return isActiveStaff() && staffData().role == 'employee';
+    }
+
+    function categoryPath(categoryId) {
+      return /databases/$(database)/documents/categories/$(categoryId);
+    }
+
+    function categoryVisibleToEmployee(categoryId) {
+      return categoryId is string
+        && exists(categoryPath(categoryId))
+        && get(categoryPath(categoryId)).data.visibleToEmployees == true;
+    }
+
+    function canAccessCategory(categoryId) {
+      return isAdmin() || (isEmployee() && categoryVisibleToEmployee(categoryId));
+    }
+
+    function validUpdateAudit(data) {
+      return data.updatedByUid == request.auth.uid
+        && data.updatedBy == staffData().name
+        && data.updatedAt == request.time;
+    }
+
+    function validCreateAudit(data) {
+      return data.createdByUid == request.auth.uid
+        && data.createdBy == staffData().name
+        && data.createdAt == request.time;
+    }
+
+    function preservesCreationAudit() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'createdAt',
+        'createdBy',
+        'createdByUid'
+      ]);
+    }
+
+    function validNewStaff(staffId) {
+      return request.resource.data.id == staffId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 3
+        && request.resource.data.email.size() <= 254
+        && (request.resource.data.role == 'admin' || request.resource.data.role == 'employee')
+        && request.resource.data.status == 'active'
+        && request.resource.data.isPrimaryAdmin == false
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+    }
+
+    match /categories/{categoryId} {
+      // Both active roles may manage category metadata. Inventory visibility for
+      // employees is still enforced separately by canAccessCategory().
+      allow get, list: if isActiveStaff();
+      allow create, update: if isActiveStaff();
+      allow delete: if isActiveStaff()
+        && categoryId != 'tiles'
+        && categoryId != 'ceramics';
+    }
+
+    // Legacy porcelain collection. Existing documents may not have categoryId/audit fields.
+    match /tiles/{tileId} {
+      allow read: if canAccessCategory('tiles');
+
+      // Admin restore may add a legacy backup document without audit metadata.
+      // Normal employee-created documents must carry server-validated audit fields.
+      allow create: if request.resource.data.categoryId == 'tiles'
+        && (
+          isAdmin()
+          || (isEmployee() && categoryVisibleToEmployee('tiles') && validCreateAudit(request.resource.data))
+        );
+
+      allow update: if canAccessCategory('tiles')
+        && validUpdateAudit(request.resource.data)
+        && preservesCreationAudit()
+        && (!('categoryId' in request.resource.data) || request.resource.data.categoryId == 'tiles');
+
+      allow delete: if canAccessCategory('tiles');
+    }
+
+    // Legacy ceramic collection. Existing documents may not have categoryId/audit fields.
+    match /ceramics/{ceramicId} {
+      allow read: if canAccessCategory('ceramics');
+
+      allow create: if request.resource.data.categoryId == 'ceramics'
+        && (
+          isAdmin()
+          || (isEmployee() && categoryVisibleToEmployee('ceramics') && validCreateAudit(request.resource.data))
+        );
+
+      allow update: if canAccessCategory('ceramics')
+        && validUpdateAudit(request.resource.data)
+        && preservesCreationAudit()
+        && (!('categoryId' in request.resource.data) || request.resource.data.categoryId == 'ceramics');
+
+      allow delete: if canAccessCategory('ceramics');
+    }
+
+    match /inventory/{itemId} {
+      allow read: if isAdmin()
+        || (
+          isEmployee()
+          && resource.data.categoryId is string
+          && categoryVisibleToEmployee(resource.data.categoryId)
+        );
+
+      allow create: if request.resource.data.categoryId is string
+        && (
+          isAdmin()
+          || (
+            isEmployee()
+            && categoryVisibleToEmployee(request.resource.data.categoryId)
+            && validCreateAudit(request.resource.data)
+          )
+        );
+
+      allow update: if resource.data.categoryId is string
+        && request.resource.data.categoryId is string
+        && resource.data.categoryId == request.resource.data.categoryId
+        && canAccessCategory(resource.data.categoryId)
+        && validUpdateAudit(request.resource.data)
+        && preservesCreationAudit();
+
+      allow delete: if resource.data.categoryId is string
+        && canAccessCategory(resource.data.categoryId);
+    }
+
+    match /staff/{staffId} {
+      // A signed-in user may read only their own profile even when inactive so the
+      // app can show/handle account status. Active admins may read the full staff list.
+      allow get: if (isSignedIn() && request.auth.uid == staffId) || isAdmin();
+      allow list: if isAdmin();
+
+      // On Spark, an active admin creates the Firebase Auth identity using a secondary
+      // client app, then creates this profile. New profiles can never self-declare as
+      // primary admin.
+      allow create: if isAdmin() && validNewStaff(staffId);
+
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name',
+          'phone',
+          'status',
+          'statusUpdatedAt',
+          'statusUpdatedBy'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 100
+        && (
+          // Primary admin may update display details only, never status.
+          (resource.data.isPrimaryAdmin == true
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              'status', 'statusUpdatedAt', 'statusUpdatedBy'
+            ]))
+          ||
+          // Other staff may be activated/deactivated by an admin, but an admin may
+          // not deactivate the account they are currently using.
+          (resource.data.isPrimaryAdmin != true
+            && (
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
+              || (
+                (request.resource.data.status == 'active' || request.resource.data.status == 'inactive')
+                && request.resource.data.statusUpdatedAt == request.time
+                && request.resource.data.statusUpdatedBy == request.auth.uid
+                && !(staffId == request.auth.uid && request.resource.data.status == 'inactive')
+              )
+            ))
+        );
+
+      allow delete: if false;
+    }
+
+    match /logs/{logId} {
+      // Legacy logs did not contain categoryId. Active employees can still read those
+      // old entries, while new category-aware logs respect category visibility.
+      allow read: if isAdmin()
+        || (
+          isEmployee()
+          && (
+            !('categoryId' in resource.data)
+            || (resource.data.categoryId is string && categoryVisibleToEmployee(resource.data.categoryId))
+          )
+        );
+
+      allow create: if isActiveStaff()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.user == staffData().name
+        && request.resource.data.timestamp == request.time
+        && request.resource.data.action is string
+        && request.resource.data.tileName is string
+        && request.resource.data.details is string
+        && request.resource.data.categoryId is string
+        && canAccessCategory(request.resource.data.categoryId);
+
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
