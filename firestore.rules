@@ -46,6 +46,33 @@ service cloud.firestore {
       return isAdmin() || (isEmployee() && categoryVisibleToEmployee(categoryId));
     }
 
+    function categoryIsHidden(data) {
+      return (('hiddenForStaff' in data) && data.hiddenForStaff == true)
+        || (('visibleToEmployees' in data) && data.visibleToEmployees == false);
+    }
+
+    function employeeCreatesVisibleCategory() {
+      return isEmployee() && !categoryIsHidden(request.resource.data);
+    }
+
+    function employeePreservesCategoryVisibility() {
+      return isEmployee()
+        && categoryIsHidden(request.resource.data) == categoryIsHidden(resource.data);
+    }
+
+    function itemIsHiddenForStaff(data) {
+      return ('hiddenForStaff' in data) && data.hiddenForStaff == true;
+    }
+
+    function employeeCreatesVisibleItem() {
+      return !isEmployee() || !itemIsHiddenForStaff(request.resource.data);
+    }
+
+    function employeePreservesItemVisibility() {
+      return !isEmployee()
+        || itemIsHiddenForStaff(request.resource.data) == itemIsHiddenForStaff(resource.data);
+    }
+
     function validUpdateAudit(data) {
       return data.updatedByUid == request.auth.uid
         && data.updatedBy == staffData().name
@@ -85,7 +112,8 @@ service cloud.firestore {
       // Both active roles may manage category metadata. Inventory visibility for
       // employees is still enforced separately by canAccessCategory().
       allow get, list: if isActiveStaff();
-      allow create, update: if isActiveStaff();
+      allow create: if isAdmin() || employeeCreatesVisibleCategory();
+      allow update: if isAdmin() || employeePreservesCategoryVisibility();
       allow delete: if isActiveStaff()
         && categoryId != 'tiles'
         && categoryId != 'ceramics';
@@ -100,12 +128,16 @@ service cloud.firestore {
       allow create: if request.resource.data.categoryId == 'tiles'
         && (
           isAdmin()
-          || (isEmployee() && categoryVisibleToEmployee('tiles') && validCreateAudit(request.resource.data))
+          || (isEmployee()
+            && categoryVisibleToEmployee('tiles')
+            && validCreateAudit(request.resource.data)
+            && employeeCreatesVisibleItem())
         );
 
       allow update: if canAccessCategory('tiles')
         && validUpdateAudit(request.resource.data)
         && preservesCreationAudit()
+        && employeePreservesItemVisibility()
         && (!('categoryId' in request.resource.data) || request.resource.data.categoryId == 'tiles');
 
       allow delete: if canAccessCategory('tiles');
@@ -118,12 +150,16 @@ service cloud.firestore {
       allow create: if request.resource.data.categoryId == 'ceramics'
         && (
           isAdmin()
-          || (isEmployee() && categoryVisibleToEmployee('ceramics') && validCreateAudit(request.resource.data))
+          || (isEmployee()
+            && categoryVisibleToEmployee('ceramics')
+            && validCreateAudit(request.resource.data)
+            && employeeCreatesVisibleItem())
         );
 
       allow update: if canAccessCategory('ceramics')
         && validUpdateAudit(request.resource.data)
         && preservesCreationAudit()
+        && employeePreservesItemVisibility()
         && (!('categoryId' in request.resource.data) || request.resource.data.categoryId == 'ceramics');
 
       allow delete: if canAccessCategory('ceramics');
@@ -144,6 +180,7 @@ service cloud.firestore {
             isEmployee()
             && categoryVisibleToEmployee(request.resource.data.categoryId)
             && validCreateAudit(request.resource.data)
+            && employeeCreatesVisibleItem()
           )
         );
 
@@ -152,7 +189,8 @@ service cloud.firestore {
         && resource.data.categoryId == request.resource.data.categoryId
         && canAccessCategory(resource.data.categoryId)
         && validUpdateAudit(request.resource.data)
-        && preservesCreationAudit();
+        && preservesCreationAudit()
+        && employeePreservesItemVisibility();
 
       allow delete: if resource.data.categoryId is string
         && canAccessCategory(resource.data.categoryId);
