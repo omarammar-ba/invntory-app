@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AnimatePresence,
@@ -26,7 +26,7 @@ export const DesktopDialog: React.FC<DesktopDialogProps> = ({
 }) => {
   const prefersReducedMotion = useReducedMotion();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
 
     const previousOverflow =

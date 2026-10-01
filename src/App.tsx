@@ -5,8 +5,8 @@ import React, {
   useMemo,
   useCallback,
 } from 'react';
-import { AnimatePresence, motion, LayoutGroup } from 'motion/react';
-import { CATEGORY_ACCENTS, springTransition, motionEase } from '@/styles/motion';
+import { motion, LayoutGroup } from 'motion/react';
+import { CATEGORY_ACCENTS, springTransition } from '@/styles/motion';
 
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
@@ -22,7 +22,7 @@ import {
   PrintIcon
 } from "@/components/ui/Icons";
 import ConfirmModal from "@/components/ui/ConfirmModal";
-import { PullToRefresh } from "@/components/ui/PullToRefresh";
+import { ElasticScroll } from "@/components/ui/ElasticScroll";
 
 import { Login } from "@/features/auth";
 import { Dashboard, SummaryCards } from "@/features/dashboard";
@@ -689,19 +689,13 @@ const App: React.FC = () => {
       }
     };
 
-  const handlePullRefresh =
+  const handleInventoryRetry =
     useCallback(
-      async () => {
+      () => {
         setInventorySyncError(null);
         setLoading(true);
         setInventoryRefreshVersion(
           previous => previous + 1
-        );
-
-        // Pull-to-refresh gives immediate tactile feedback. The inventory
-        // continues loading in small Firestore batches in the background.
-        await new Promise(resolve =>
-          window.setTimeout(resolve, 450)
         );
       },
       []
@@ -920,7 +914,7 @@ const App: React.FC = () => {
 
         console.error(`Inventory batch load failed for ${collectionName}:`, error);
         setInventorySyncError(
-          'تعذر تحديث جزء من المخزون. اسحب للأسفل للمحاولة مرة أخرى.'
+          'تعذر تحديث جزء من المخزون. اضغط إعادة المحاولة.'
         );
       }
     };
@@ -1026,7 +1020,7 @@ const App: React.FC = () => {
               }
               console.error(`Inventory batch load failed for ${categoryId}:`, error);
               setInventorySyncError(
-                'تعذر تحديث جزء من المخزون. اسحب للأسفل للمحاولة مرة أخرى.'
+                'تعذر تحديث جزء من المخزون. اضغط إعادة المحاولة.'
               );
             }
           })()
@@ -3019,7 +3013,7 @@ const App: React.FC = () => {
             <span>{inventorySyncError}</span>
             <button
               type="button"
-              onClick={() => void handlePullRefresh()}
+              onClick={handleInventoryRetry}
               className="shrink-0 rounded-[9px] bg-white/80 px-2.5 py-1 font-bold text-amber-800 dark:bg-neutral-900/60 dark:text-amber-300"
             >
               إعادة المحاولة
@@ -3027,10 +3021,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <PullToRefresh
-          onRefresh={
-            handlePullRefresh
-          }
+        <ElasticScroll
           disabled={
             isAddingNew ||
             !!editingTile ||
@@ -3708,7 +3699,7 @@ const App: React.FC = () => {
                 )}
             </div>
           </div>
-        </PullToRefresh>
+        </ElasticScroll>
       </div>
 
       {(isAddingNew || editingTile) && (
@@ -4030,4 +4021,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-

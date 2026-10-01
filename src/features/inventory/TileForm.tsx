@@ -1,5 +1,6 @@
 import React, {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -549,7 +550,7 @@ const TileForm:
         null,
       );
 
-    useEffect(() => {
+    useLayoutEffect(() => {
       if (editingTile) {
         setFormState({
           name:

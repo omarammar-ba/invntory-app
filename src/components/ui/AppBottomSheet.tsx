@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { X as CloseIcon } from 'lucide-react';
@@ -35,7 +35,7 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
     if (open) setSnap(initialSnap);
   }, [open, initialSnap]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
 
     const previousOverflow = document.body.style.overflow;
@@ -160,8 +160,6 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
               height: SNAP_HEIGHTS[snap],
               WebkitBackfaceVisibility: 'hidden',
               backfaceVisibility: 'hidden',
-              WebkitTransform: 'translateZ(0)',
-              transform: 'translateZ(0)',
             }}
           >
             <motion.div
