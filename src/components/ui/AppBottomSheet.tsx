@@ -8,6 +8,7 @@ export type AppBottomSheetSnap = 'compact' | 'large' | 'expanded';
 export interface AppBottomSheetProps {
   open: boolean;
   onClose: () => void;
+  onExited?: () => void;
   title?: string;
   initialSnap?: AppBottomSheetSnap;
   children: React.ReactNode;
@@ -23,6 +24,7 @@ const SNAP_HEIGHTS: Record<AppBottomSheetSnap, string> = {
 export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
   open,
   onClose,
+  onExited,
   title,
   initialSnap = 'expanded',
   children,
@@ -30,13 +32,18 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
 }) => {
   const prefersReducedMotion = useReducedMotion();
   const [snap, setSnap] = useState<AppBottomSheetSnap>(initialSnap);
+  const [isPresent, setIsPresent] = useState(open);
 
   useEffect(() => {
     if (open) setSnap(initialSnap);
   }, [open, initialSnap]);
 
   useLayoutEffect(() => {
-    if (!open) return;
+    if (open) setIsPresent(true);
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!isPresent) return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -50,13 +57,13 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [open, onClose]);
+  }, [isPresent, onClose]);
 
   const springConfig = useMemo(
     () =>
       prefersReducedMotion
         ? ({ duration: 0 } as const)
-        : ({ type: 'spring', stiffness: 380, damping: 38, mass: 0.8 } as const),
+        : ({ duration: 0.28, ease: [0.22, 1, 0.36, 1] } as const),
     [prefersReducedMotion],
   );
 
@@ -104,11 +111,17 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <AnimatePresence>
+    <AnimatePresence onExitComplete={() => {
+      setIsPresent(false);
+      onExited?.();
+    }}>
       {open && (
-        <div
+        <motion.div
           className="fixed inset-0 z-[300]"
           role="presentation"
+          initial={false}
+          exit={{ opacity: 1 }}
+          transition={{ duration: 0.28 }}
         >
           <motion.button
             type="button"
@@ -268,7 +281,7 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
               {children}
             </div>
           </motion.section>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>,
     document.body,

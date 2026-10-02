@@ -42,6 +42,8 @@ import {
 } from '@/components/ui/AppChoiceField';
 
 interface TileFormProps {
+  open?: boolean;
+  onExited?: () => void;
   onSave: (tile: any) => Promise<void>;
   editingTile: Tile | null;
   onCancel: () => void;
@@ -162,6 +164,8 @@ interface FormState {
 
 const TileForm:
   React.FC<TileFormProps> = ({
+    open = true,
+    onExited,
     onSave,
     editingTile,
     onCancel,
@@ -2127,7 +2131,8 @@ const TileForm:
 
     return (
       <ResponsiveOverlay
-        open={true}
+        open={open}
+        onExited={onExited}
         onClose={
           onCancel
         }

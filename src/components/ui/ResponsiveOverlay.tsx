@@ -9,6 +9,7 @@ import { DesktopDialog } from './DesktopDialog';
 export interface ResponsiveOverlayProps {
   open: boolean;
   onClose: () => void;
+  onExited?: () => void;
   title?: string;
   mobileSnap?: AppBottomSheetSnap;
   desktopMaxWidth?: string;
@@ -21,6 +22,7 @@ export const ResponsiveOverlay: React.FC<
 > = ({
   open,
   onClose,
+  onExited,
   title,
   mobileSnap = 'expanded',
   desktopMaxWidth = 'max-w-2xl',
@@ -34,6 +36,7 @@ export const ResponsiveOverlay: React.FC<
       <AppBottomSheet
         open={open}
         onClose={onClose}
+        onExited={onExited}
         title={title}
         initialSnap={mobileSnap}
         contentClassName={contentClassName}
@@ -47,6 +50,7 @@ export const ResponsiveOverlay: React.FC<
     <DesktopDialog
       open={open}
       onClose={onClose}
+      onExited={onExited}
       title={title}
       maxWidth={desktopMaxWidth}
       contentClassName={contentClassName}

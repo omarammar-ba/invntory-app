@@ -387,6 +387,8 @@ const App: React.FC = () => {
     setIsAddingNew
   ] = useState(false);
 
+  const [isTileFormClosing, setIsTileFormClosing] = useState(false);
+
   const [
     addItemSource,
     setAddItemSource
@@ -1911,13 +1913,7 @@ const App: React.FC = () => {
               );
             }
 
-            setEditingTile(
-              null
-            );
-
-            setIsAddingNew(
-              false
-            );
+            setIsTileFormClosing(true);
 
             void logAction(
               'تعديل',
@@ -2052,9 +2048,7 @@ const App: React.FC = () => {
               );
             }
 
-            setIsAddingNew(
-              false
-            );
+            setIsTileFormClosing(true);
 
             setActiveCategoryId(
               targetCategory
@@ -3704,12 +3698,15 @@ const App: React.FC = () => {
 
       {(isAddingNew || editingTile) && (
         <TileForm
-          onSave={handleSaveTile}
-          editingTile={editingTile}
-          onCancel={() => {
+          open={!isTileFormClosing}
+          onExited={() => {
             setEditingTile(null);
             setIsAddingNew(false);
+            setIsTileFormClosing(false);
           }}
+          onSave={handleSaveTile}
+          editingTile={editingTile}
+          onCancel={() => setIsTileFormClosing(true)}
           onViewImage={setViewingImage}
           activeCategoryId={activeCategoryId || undefined}
           category={activeCategoryData}

@@ -1,4 +1,4 @@
-import React, { useLayoutEffect } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AnimatePresence,
@@ -10,6 +10,7 @@ import { X as CloseIcon } from 'lucide-react';
 export interface DesktopDialogProps {
   open: boolean;
   onClose: () => void;
+  onExited?: () => void;
   title?: string;
   maxWidth?: string;
   children: React.ReactNode;
@@ -19,15 +20,21 @@ export interface DesktopDialogProps {
 export const DesktopDialog: React.FC<DesktopDialogProps> = ({
   open,
   onClose,
+  onExited,
   title,
   maxWidth = 'max-w-2xl',
   children,
   contentClassName = 'p-6',
 }) => {
   const prefersReducedMotion = useReducedMotion();
+  const [isPresent, setIsPresent] = useState(open);
 
   useLayoutEffect(() => {
-    if (!open) return;
+    if (open) setIsPresent(true);
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!isPresent) return;
 
     const previousOverflow =
       document.body.style.overflow;
@@ -56,16 +63,19 @@ export const DesktopDialog: React.FC<DesktopDialogProps> = ({
         onKeyDown,
       );
     };
-  }, [open, onClose]);
+  }, [isPresent, onClose]);
 
   if (typeof document === 'undefined') {
     return null;
   }
 
   return createPortal(
-    <AnimatePresence>
+    <AnimatePresence onExitComplete={() => {
+      setIsPresent(false);
+      onExited?.();
+    }}>
       {open && (
-        <div
+        <motion.div
           className="
             fixed
             inset-0
@@ -75,6 +85,9 @@ export const DesktopDialog: React.FC<DesktopDialogProps> = ({
             justify-center
             p-6
           "
+          initial={false}
+          exit={{ opacity: 1 }}
+          transition={{ duration: 0.2 }}
         >
           <motion.button
             type="button"
@@ -215,7 +228,7 @@ export const DesktopDialog: React.FC<DesktopDialogProps> = ({
               {children}
             </div>
           </motion.section>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>,
     document.body,
