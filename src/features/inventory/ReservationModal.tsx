@@ -274,7 +274,7 @@ const ReservationModal:
 
     const handleSaveReservations =
       async () => {
-        if (isSaving) return;
+        if (isSaving || showAddForm || confirmDeleteId) return;
 
         setIsSaving(true);
 
@@ -1119,7 +1119,7 @@ const ReservationModal:
             onClick={
               handleSaveReservations
             }
-            disabled={isSaving}
+            disabled={isSaving || showAddForm || Boolean(confirmDeleteId)}
             className="
               flex
               h-11
@@ -1141,7 +1141,13 @@ const ReservationModal:
             "
           >
             <SaveIcon />
-            {isSaving ? 'جاري الحفظ...' : 'حفظ الحجوزات'}
+            {isSaving
+              ? 'جاري الحفظ...'
+              : showAddForm
+                ? 'أكمل الحجز أولاً'
+                : confirmDeleteId
+                  ? 'أكمل تأكيد الحذف أولاً'
+                  : 'حفظ الحجوزات'}
           </button>
         </div>
       </ResponsiveOverlay>

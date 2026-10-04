@@ -2,6 +2,7 @@ import { MotionModal } from '@/components/motion/MotionModal';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Tile, Category, StaffMember } from '@/types';
 import { PrintIcon, CancelIcon } from '@/components/ui/Icons';
+import { calculateAvailableQuantity, calculateReservedQuantity } from '@/features/inventory/inventoryCalculations';
 
 interface PrintPdfModalProps {
   isOpen: boolean;
@@ -66,15 +67,9 @@ const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
     }
 
     if (stockFilter === 'available') {
-      list = list.filter(t => {
-        const reserved = t.reservations?.reduce((sum, r) => sum + r.meters, 0) || 0;
-        return (t.meters - reserved) > 0;
-      });
+      list = list.filter(t => calculateAvailableQuantity(t) > 0);
     } else if (stockFilter === 'reserved') {
-      list = list.filter(t => {
-        const reserved = t.reservations?.reduce((sum, r) => sum + r.meters, 0) || 0;
-        return reserved > 0;
-      });
+      list = list.filter(t => calculateReservedQuantity(t) > 0);
     }
 
     return list;
@@ -117,13 +112,14 @@ const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
 
     filteredData.forEach(item => {
       const isPiece = item.unitType === 'pieces' || item.categoryId === 'shower_box' || item.categoryId === 'mixers' || item.categoryId === 'sanitary';
-      const reserved = item.reservations?.reduce((sum, r) => sum + r.meters, 0) || 0;
+      const reserved = calculateReservedQuantity(item);
+      const available = calculateAvailableQuantity(item);
       
       if (isPiece) {
-        totalPieces += item.meters || 0;
+        totalPieces += available;
         totalReservedPieces += reserved;
       } else {
-        totalMeters += item.meters || 0;
+        totalMeters += available;
         totalReservedMeters += reserved;
       }
     });
@@ -369,7 +365,7 @@ const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
             ) : (
               groupedByCategory.map(({ category, items }, catIdx) => {
                 const isPiece = category.defaultUnit === 'pieces' || category.id === 'shower_box' || category.id === 'mixers' || category.id === 'sanitary';
-                const catTotalQty = items.reduce((sum, i) => sum + (i.meters || 0), 0);
+                const catTotalQty = items.reduce((sum, i) => sum + calculateAvailableQuantity(i), 0);
 
                 return (
                   <div key={category.id} className="mb-8 break-inside-avoid">
@@ -417,7 +413,7 @@ const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
                                   <td className="py-2 px-2.5 text-center font-bold text-slate-700 border-l border-slate-300">{idx + 1}</td>
                                   <td className="py-2 px-2.5 font-bold border-l border-slate-300">{tile.name}</td>
                                   <td className="py-2 px-2.5 text-center font-black text-slate-900">
-                                    {tile.meters} {isTilePiece ? 'قطعة' : 'م²'}
+                                    {calculateAvailableQuantity(tile)} {isTilePiece ? 'قطعة' : 'م²'}
                                   </td>
                                 </tr>
                               );
@@ -443,7 +439,7 @@ const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
                                 )}
                                 <td className="py-2 px-2.5 text-center font-black text-slate-900">
                                   <span>
-                                    {tile.meters} {isTilePiece ? 'قطعة' : 'م²'}
+                                    {calculateAvailableQuantity(tile)} {isTilePiece ? 'قطعة' : 'م²'}
                                   </span>
                                 </td>
                               </tr>

@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   useEffect,
+  useRef,
   useState,
 } from 'react';
 
@@ -44,6 +45,8 @@ const StaffManagerModal:
     onClose,
     currentStaff,
   }) => {
+    const isSavingStaffRef = useRef(false);
+    const [isSavingStaff, setIsSavingStaff] = useState(false);
     const [
       staffList,
       setStaffList,
@@ -207,6 +210,8 @@ const StaffManagerModal:
       ) => {
         event.preventDefault();
 
+        if (isSavingStaffRef.current) return;
+
         if (
           !name.trim()
         ) {
@@ -217,7 +222,14 @@ const StaffManagerModal:
           return;
         }
 
+        if (!editingStaffId && (!email.trim() || !password.trim())) {
+          setErrorMessage('يجب إدخال البريد الإلكتروني وكلمة المرور لإنشاء حساب جديد');
+          return;
+        }
+
         setErrorMessage('');
+        isSavingStaffRef.current = true;
+        setIsSavingStaff(true);
 
         try {
           if (
@@ -242,16 +254,6 @@ const StaffManagerModal:
               'تم تحديث بيانات الموظف بنجاح',
             );
           } else {
-            if (
-              !email.trim() ||
-              !password.trim()
-            ) {
-              setErrorMessage(
-                'يجب إدخال البريد الإلكتروني وكلمة المرور لإنشاء حساب جديد',
-              );
-
-              return;
-            }
             await staffService.createStaff({
               name: name.trim(),
               email: email.trim(),
@@ -285,6 +287,9 @@ const StaffManagerModal:
             error.message ||
               'حدث خطأ أثناء حفظ بيانات الموظف',
           );
+        } finally {
+          isSavingStaffRef.current = false;
+          setIsSavingStaff(false);
         }
       };
 
@@ -758,10 +763,11 @@ const StaffManagerModal:
             <div className="flex justify-end border-t border-slate-100 px-4 py-3.5 dark:border-white/[0.05] sm:px-5">
               <button
                 type="submit"
-                className="flex h-10 items-center justify-center gap-1.5 rounded-[12px] bg-slate-900 px-5 text-xs font-bold text-white shadow-sm transition active:scale-[0.98] dark:bg-white dark:text-slate-900"
+                disabled={isSavingStaff}
+                className="flex h-10 items-center justify-center gap-1.5 rounded-[12px] bg-slate-900 px-5 text-xs font-bold text-white shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900"
               >
                 <CheckIcon className="h-4 w-4" />
-                {editingStaffId ? 'حفظ التعديل' : 'حفظ الموظف'}
+                {isSavingStaff ? 'جاري الحفظ...' : editingStaffId ? 'حفظ التعديل' : 'حفظ الموظف'}
               </button>
             </div>
           </form>

@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle, ArrowRight, Eye, EyeOff, Layers, Lock, Mail } from 'lucide-react';
 import { auth, isFirebaseConfigured } from '@/services/firebase';
+import {
+  clearLoginAttempts,
+  getLoginAttemptStatus,
+  LOGIN_ATTEMPT_STORAGE_PREFIX,
+  MAX_LOGIN_FAILURES,
+  recordLoginFailure,
+  startLoginCooldown,
+} from './loginAttemptLimit';
 
 interface LoginProps {
   onLoginSuccess?: (email: string) => void;
@@ -12,10 +20,48 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(false);
+  const [attemptStatus, setAttemptStatus] = useState(() => getLoginAttemptStatus(''));
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    setAttemptStatus(getLoginAttemptStatus(email));
+    setError(null);
+  }, [email]);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key?.startsWith(LOGIN_ATTEMPT_STORAGE_PREFIX)) {
+        setAttemptStatus(getLoginAttemptStatus(email));
+        setNow(Date.now());
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [email]);
+
+  useEffect(() => {
+    if (attemptStatus.lockedUntil <= now) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [attemptStatus.lockedUntil, attemptStatus.lockedUntil > now]);
+
+  const lockedSeconds = Math.max(0, Math.ceil((attemptStatus.lockedUntil - now) / 1000));
+  const lockCountdown = `${Math.floor(lockedSeconds / 60)}:${String(lockedSeconds % 60).padStart(2, '0')}`;
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (loading) return;
+    if (loadingRef.current) return;
+
+    const loginEmail = email.trim();
+    const normalizedEmail = loginEmail.toLowerCase();
+    const currentStatus = getLoginAttemptStatus(normalizedEmail);
+    setAttemptStatus(currentStatus);
+    setNow(Date.now());
+    if (currentStatus.lockedUntil > Date.now()) {
+      setError(null);
+      return;
+    }
 
     setError(null);
 
@@ -25,30 +71,43 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     }
 
     try {
+      loadingRef.current = true;
       setLoading(true);
-      await auth.signInWithEmailAndPassword(email.trim(), password);
-      onLoginSuccess?.(email.trim());
+      await auth.signInWithEmailAndPassword(loginEmail, password);
+      clearLoginAttempts(normalizedEmail);
+      setAttemptStatus(getLoginAttemptStatus(normalizedEmail));
+      onLoginSuccess?.(loginEmail);
     } catch (err: any) {
       const code = String(err?.code || '');
-      let message = 'فشل تسجيل الدخول. تحقق من البيانات وحاول مرة أخرى.';
+      let message: string | null = 'فشل تسجيل الدخول. تحقق من البيانات وحاول مرة أخرى.';
 
       if (
         code === 'auth/user-not-found' ||
         code === 'auth/wrong-password' ||
         code === 'auth/invalid-credential' ||
-        code === 'auth/invalid-email'
+        code === 'auth/invalid-login-credentials'
       ) {
-        message = 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
+        const nextStatus = recordLoginFailure(normalizedEmail);
+        setAttemptStatus(nextStatus);
+        setNow(Date.now());
+        message = nextStatus.lockedUntil
+          ? null
+          : `البريد الإلكتروني أو كلمة المرور غير صحيحة. بقي ${nextStatus.remaining} من ${MAX_LOGIN_FAILURES} محاولات.`;
+      } else if (code === 'auth/invalid-email') {
+        message = 'تحقق من صيغة البريد الإلكتروني.';
       } else if (code === 'auth/user-disabled') {
         message = 'هذا الحساب معطّل. راجع مدير النظام.';
       } else if (code === 'auth/too-many-requests') {
-        message = 'تم إيقاف المحاولات مؤقتًا بسبب كثرة المحاولات. حاول لاحقًا.';
+        setAttemptStatus(startLoginCooldown(normalizedEmail));
+        setNow(Date.now());
+        message = 'أوقف Firebase محاولات الدخول مؤقتًا بسبب كثرتها. حاول لاحقًا.';
       } else if (code === 'auth/network-request-failed') {
         message = 'تعذر الاتصال بالخادم. تحقق من اتصال الإنترنت.';
       }
 
       setError(message);
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   };
@@ -125,9 +184,15 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               </div>
             )}
 
+            {lockedSeconds > 0 && (
+              <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/35 dark:text-amber-200">
+                محاولات كثيرة لهذا البريد على هذا الجهاز. جرّب بعد {lockCountdown}
+              </p>
+            )}
+
             <button
               type="submit"
-              disabled={loading || !isFirebaseConfigured}
+              disabled={loading || !isFirebaseConfigured || lockedSeconds > 0}
               className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-bold text-white shadow-sm transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 sm:py-3.5 sm:text-sm"
             >
               {loading ? (

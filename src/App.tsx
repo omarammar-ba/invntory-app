@@ -3729,8 +3729,8 @@ const App: React.FC = () => {
           onCustomizeCategory={
             isEmployee
               ? undefined
-              : () => {
-                  setEditingCategoryModalId(activeCategoryId);
+               : catId => {
+                   setEditingCategoryModalId(catId);
                   setIsCategoryModalOpen(true);
                 }
           }

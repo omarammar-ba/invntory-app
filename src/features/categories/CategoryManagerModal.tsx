@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 import {
   Category,
@@ -242,6 +242,9 @@ const CategoryManagerModal:
       initialEditingCategoryId ||
       initialEditId ||
       null;
+
+    const isSavingCategoryRef = useRef(false);
+    const [isSavingCategory, setIsSavingCategory] = useState(false);
 
     const [
       editingCatId,
@@ -1306,6 +1309,8 @@ const CategoryManagerModal:
       ) => {
         event.preventDefault();
 
+        if (isSavingCategoryRef.current) return;
+
         setError(null);
 
         const nameTrimmed =
@@ -1322,9 +1327,9 @@ const CategoryManagerModal:
         }
 
         if (
-          !editingCatId &&
           categories.some(
             category =>
+              category.id !== editingCatId &&
               category.name.toLowerCase() ===
               nameTrimmed.toLowerCase(),
           )
@@ -1388,6 +1393,9 @@ const CategoryManagerModal:
                   : undefined,
             }),
           );
+
+        isSavingCategoryRef.current = true;
+        setIsSavingCategory(true);
 
         try {
           let savedCategory:
@@ -1583,6 +1591,9 @@ const CategoryManagerModal:
           setError(
             'حدث خطأ أثناء حفظ القسم.',
           );
+        } finally {
+          isSavingCategoryRef.current = false;
+          setIsSavingCategory(false);
         }
       };
 
@@ -3842,6 +3853,7 @@ const CategoryManagerModal:
               >
                 <button
                   type="submit"
+                  disabled={isSavingCategory}
                   className="
                     flex
                     h-11
@@ -3857,6 +3869,8 @@ const CategoryManagerModal:
                     text-white
                     transition
                     active:scale-[0.98]
+                    disabled:cursor-not-allowed
+                    disabled:opacity-60
                     dark:bg-white
                     dark:text-slate-900
                   "
@@ -3868,7 +3882,9 @@ const CategoryManagerModal:
                   )}
 
                   <span>
-                    {editingCatId
+                    {isSavingCategory
+                      ? 'جاري الحفظ...'
+                      : editingCatId
                       ? 'حفظ القسم'
                       : 'إضافة القسم'}
                   </span>

@@ -54,7 +54,7 @@ interface TileFormProps {
   onSelectCategory?: (
     catId: string,
   ) => void;
-  onCustomizeCategory?: () => void;
+  onCustomizeCategory?: (catId: string) => void;
   allowCategorySwitch?: boolean;
   canManageVisibility?: boolean;
 }
@@ -1978,8 +1978,8 @@ const TileForm:
               {onCustomizeCategory && (
                 <button
                   type="button"
-                  onClick={
-                    onCustomizeCategory
+                  onClick={() =>
+                    onCustomizeCategory(selectedCatId)
                   }
                   className="rounded-[9px] px-2.5 py-1.5 text-[10px] font-bold text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/30"
                 >
@@ -2192,9 +2192,7 @@ const TileForm:
             {onCustomizeCategory && (
                 <button
                   type="button"
-                  onClick={
-                    onCustomizeCategory
-                  }
+                  onClick={() => onCustomizeCategory(selectedCatId)}
                   className="
                     flex h-9 items-center gap-1.5 rounded-full
                     border border-slate-200/70 bg-slate-50 px-3
