@@ -55,7 +55,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const content = (
-    <div className="space-y-4" dir="rtl">
+    <div className="app-readable space-y-4" dir="rtl">
       <section className="overflow-hidden rounded-[18px] border border-slate-200/70 bg-white shadow-sm dark:border-white/[0.07] dark:bg-neutral-900">
         <div className="flex items-center gap-3 px-3.5 py-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-neutral-800 dark:text-slate-300">

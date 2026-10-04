@@ -2,8 +2,8 @@ import React, { useRef, useState } from 'react';
 
 import { MotionModal } from '@/components/motion/MotionModal';
 import { ResponsiveOverlay } from '@/components/ui/ResponsiveOverlay';
+import { ActionFeedback } from '@/components/ui/ActionFeedback';
 import {
-  AlertCircleIcon,
   CancelIcon,
   CheckCircleIcon,
   DatabaseIcon,
@@ -174,19 +174,13 @@ const BackupModal: React.FC<BackupModalProps> = ({
   };
 
   const content = (
-    <div className="space-y-4" dir="rtl">
+    <div className="app-readable space-y-4" dir="rtl">
       {successMessage && (
-        <div className="flex items-center gap-2 rounded-[13px] border border-emerald-200/70 bg-emerald-50 px-3 py-2.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
-          <CheckCircleIcon />
-          <span>{successMessage}</span>
-        </div>
+        <ActionFeedback tone="success" message={successMessage} />
       )}
 
       {errorMessage && (
-        <div className="flex items-center gap-2 rounded-[13px] border border-rose-200/70 bg-rose-50 px-3 py-2.5 text-[11px] font-semibold text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
-          <AlertCircleIcon />
-          <span>{errorMessage}</span>
-        </div>
+        <ActionFeedback tone="error" message={errorMessage} />
       )}
 
       <div>

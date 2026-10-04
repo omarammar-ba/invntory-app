@@ -35,6 +35,7 @@ import {
 import {
   ResponsiveOverlay,
 } from '@/components/ui/ResponsiveOverlay';
+import { ActionFeedback } from '@/components/ui/ActionFeedback';
 
 import {
   AppChoiceField,
@@ -544,6 +545,17 @@ const TileForm:
       setIsSaving,
     ] = useState(false);
 
+    const [formError, setFormError] = useState<string | null>(null);
+    const feedbackRef = useRef<HTMLDivElement>(null);
+
+    const showError = (message: string) => {
+      setFormError(message);
+      window.requestAnimationFrame(() => {
+        feedbackRef.current?.focus();
+        feedbackRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    };
+
     const fileInputRef =
       useRef<HTMLInputElement>(
         null,
@@ -844,6 +856,7 @@ const TileForm:
       (
         newCatId: string,
       ) => {
+        setFormError(null);
         setSelectedCatId(
           newCatId,
         );
@@ -1065,7 +1078,7 @@ const TileForm:
               );
             } catch (error) {
               console.error('Image compression error:', error);
-              alert(
+              showError(
                 error instanceof Error
                   ? error.message
                   : 'تعذر تجهيز الصورة. جرّب صورة أخرى.',
@@ -1080,7 +1093,7 @@ const TileForm:
         reader.onerror =
           () => {
             setIsCompressing(false);
-            alert('تعذر قراءة ملف الصورة.');
+            showError('تعذر قراءة ملف الصورة.');
           };
 
         reader.readAsDataURL(
@@ -1504,7 +1517,7 @@ const TileForm:
               ? error.message
               : 'تعذر حفظ الصنف. تحقق من الاتصال ثم حاول مرة أخرى.';
 
-          alert(message);
+          showError(message);
           setIsSaving(false);
           return false;
         }
@@ -1547,7 +1560,7 @@ const TileForm:
             });
 
           if (missingRequiredField) {
-            alert(`يرجى تعبئة الحقل المطلوب: ${missingRequiredField.label}`);
+            showError(`يرجى تعبئة الحقل المطلوب: ${missingRequiredField.label}`);
             return;
           }
 
@@ -1585,7 +1598,7 @@ const TileForm:
               !hasAnyValue &&
               !finalName
             ) {
-              alert(
+              showError(
                 'يرجى إدخال اسم الصنف أو تعبئة أحد الخصائص المميزة',
               );
 
@@ -1609,7 +1622,7 @@ const TileForm:
           if (
             !finalName
           ) {
-            alert(
+            showError(
               'يرجى تحديد أو كتابة اسم الصنف',
             );
 
@@ -1629,7 +1642,7 @@ const TileForm:
             ) ||
             quantityValue < 0
           ) {
-            alert(
+            showError(
               'يرجى إدخال كمية متوفرة صحيحة',
             );
 
@@ -1643,7 +1656,7 @@ const TileForm:
               quantityValue,
             )
           ) {
-            alert(
+            showError(
               'كمية الأصناف بالقطعة يجب أن تكون عدداً صحيحاً.',
             );
 
@@ -1723,13 +1736,18 @@ const TileForm:
           return;
         }
 
+        if (!formState.name.trim()) {
+          showError('يرجى إدخال اسم الموديل أو الصنف');
+          return;
+        }
+
         if (
           formState.meters ===
             '' &&
           formState.boxes ===
             ''
         ) {
-          alert(
+          showError(
             'يرجى إدخال الكمية أو الأمتار',
           );
 
@@ -1757,19 +1775,9 @@ const TileForm:
           numericBoxes < 0 ||
           numericPallets < 0
         ) {
-          alert(
+          showError(
             'تأكد أن الكميات والكراتين والطبالي أرقام صحيحة وغير سالبة.',
           );
-          return;
-        }
-
-        if (
-          !formState.name.trim()
-        ) {
-          alert(
-            'يرجى إدخال اسم الموديل أو الصنف',
-          );
-
           return;
         }
 
@@ -2143,7 +2151,7 @@ const TileForm:
         }
         mobileSnap="compact"
         desktopMaxWidth="max-w-2xl"
-        contentClassName="p-0"
+        contentClassName="app-readable p-0"
       >
         <div
           className="
@@ -2291,15 +2299,27 @@ const TileForm:
 
         <form
           id="tile-form"
+          noValidate
           onSubmit={
             handleSubmit
           }
+          onChange={() => setFormError(null)}
           className="
             space-y-4
             p-4
             sm:p-6
           "
         >
+          <p className="text-sm font-medium leading-6 text-slate-600 dark:text-slate-300">
+            أدخل اسم الصنف والكمية أولاً. الحقول المعلّمة بنجمة مطلوبة، والصورة اختيارية.
+          </p>
+
+          {formError && (
+            <div ref={feedbackRef} tabIndex={-1} className="outline-none">
+              <ActionFeedback tone="error" message={formError} />
+            </div>
+          )}
+
           {isSystem ? (
             <>
               <div
@@ -2334,17 +2354,21 @@ const TileForm:
                     "
                   />
 
-                  <span
+                  <h3
                     className="
-                      text-xs
+                      text-sm
                       font-black
                       text-slate-800
                       dark:text-slate-200
                     "
                   >
                     البيانات والمواصفات الأساسية
-                  </span>
+                  </h3>
                 </div>
+
+                <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  اسم واضح ومواصفات تساعدك تميّز الصنف عند البحث.
+                </p>
 
                 <div
                   className="
@@ -2862,24 +2886,29 @@ const TileForm:
                       "
                     />
 
-                    <span
+                    <h3
                       className="
-                        text-xs
+                        text-sm
                         font-black
                         text-slate-800
                         dark:text-slate-200
                       "
                     >
                       الكميات والحسابات الفورية
-                    </span>
+                    </h3>
                   </div>
                 </div>
+
+                <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  أدخل الكميات كما هي في المخزون.
+                </p>
 
                 <div
                   className="
                     grid
-                    grid-cols-3
+                    grid-cols-1
                     gap-2.5
+                    sm:grid-cols-3
                   "
                 >
                   <div>
@@ -3068,9 +3097,9 @@ const TileForm:
                     "
                   />
 
-                  <span
+                  <h3
                     className="
-                      text-xs
+                      text-sm
                       font-black
                       text-slate-800
                       dark:text-slate-200
@@ -3080,8 +3109,12 @@ const TileForm:
                     {
                       effectiveCategory.name
                     }
-                  </span>
+                  </h3>
                 </div>
+
+                <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  اختر الخصائص التي تميّز الصنف، ويمكنك تعديلها لاحقًا.
+                </p>
 
                 {activeCustomFields.length >
                 0 ? (
@@ -3429,16 +3462,16 @@ const TileForm:
                       "
                     />
 
-                    <span
+                    <h3
                       className="
-                        text-xs
+                        text-sm
                         font-black
                         text-slate-800
                         dark:text-slate-200
                       "
                     >
                       الكمية المتوفرة ووحدة القياس
-                    </span>
+                    </h3>
                   </div>
                 </div>
 
@@ -3530,9 +3563,9 @@ const TileForm:
                 dark:border-neutral-700/60
               "
             >
-              <span
+              <h3
                 className="
-                  text-xs
+                  text-sm
                   font-black
                   text-slate-800
                   dark:text-slate-200
@@ -3541,7 +3574,7 @@ const TileForm:
                 {showImageField
                   ? 'صورة الصنف وإعدادات الظهور'
                   : 'إعدادات الظهور'}
-              </span>
+              </h3>
 
               {!showImageField &&
                 formState.image && (
@@ -3557,6 +3590,12 @@ const TileForm:
                   </span>
                 )}
             </div>
+
+            {showImageField && (
+              <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+                الصورة اختيارية، ويمكنك إضافتها لاحقًا.
+              </p>
+            )}
 
             {showImageField && (
               <div>

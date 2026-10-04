@@ -18,9 +18,9 @@ import {
   db,
 } from '@/services/firebase';
 import { staffService } from './staff.service';
+import { ActionFeedback } from '@/components/ui/ActionFeedback';
 
 import {
-  CheckCircleIcon,
   CheckIcon,
   DeleteIcon,
   EditIcon,
@@ -601,20 +601,15 @@ const StaffManagerModal:
 
     const content = (
       <div
-        className="space-y-4"
+        className="app-readable space-y-4"
         dir="rtl"
       >
         {successMessage && (
-          <div className="flex items-center gap-2.5 rounded-[14px] border border-emerald-200/70 bg-emerald-50 px-3.5 py-3 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
-            <CheckCircleIcon className="h-4 w-4 shrink-0" />
-            <span>{successMessage}</span>
-          </div>
+          <ActionFeedback tone="success" message={successMessage} />
         )}
 
         {errorMessage && (
-          <div className="rounded-[14px] border border-rose-200/70 bg-rose-50 px-3.5 py-3 text-[11px] font-semibold text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
-            {errorMessage}
-          </div>
+          <ActionFeedback tone="error" message={errorMessage} />
         )}
 
         {warningMessage && (

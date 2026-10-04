@@ -207,6 +207,13 @@
 /* =========================================
    SILKY SMOOTH TACTILE BUTTONS & ICONS SYSTEM
    ========================================= */
+/* Keep dense labels legible without changing data tables or layout structure. */
+.app-readable .text-\[9px\],
+.app-readable .text-\[10px\],
+.app-readable .text-\[11px\] {
+  font-size: 12px;
+}
+
 button, 
 [role="button"],
 .interactive-btn {

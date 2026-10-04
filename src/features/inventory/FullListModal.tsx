@@ -209,7 +209,7 @@ export const FullListModal:
         title={`المخزون الكامل - ${category.name}`}
         mobileSnap="large"
         desktopMaxWidth="max-w-5xl"
-        contentClassName="p-0"
+        contentClassName="app-readable p-0"
       >
         <div className="min-h-full bg-slate-50/40 dark:bg-neutral-950/20">
           <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/95 px-3 py-3 backdrop-blur-md dark:border-white/[0.06] dark:bg-neutral-900/95 sm:px-5">

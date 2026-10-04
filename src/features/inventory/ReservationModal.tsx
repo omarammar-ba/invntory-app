@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Plus, User } from 'lucide-react';
 import { Reservation, Tile } from '@/types';
 
@@ -12,6 +12,7 @@ import {
 import {
   ResponsiveOverlay
 } from '@/components/ui/ResponsiveOverlay';
+import { ActionFeedback } from '@/components/ui/ActionFeedback';
 
 interface ReservationModalProps {
   tile: Tile;
@@ -77,6 +78,16 @@ const ReservationModal:
       isSaving,
       setIsSaving
     ] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+    const feedbackRef = useRef<HTMLDivElement>(null);
+
+    const showError = (message: string) => {
+      setErrorMessage(message);
+      window.requestAnimationFrame(() => {
+        feedbackRef.current?.focus();
+        feedbackRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    };
 
     const isPieceUnit =
       tile.unitType ===
@@ -114,6 +125,7 @@ const ReservationModal:
       );
 
     const resetForm = () => {
+      setErrorMessage('');
       setNewName('');
       setNewQty('');
       setNewNotes('');
@@ -127,6 +139,7 @@ const ReservationModal:
           !newName.trim() ||
           !newQty
         ) {
+          showError('أدخل اسم العميل وكمية الحجز.');
           return;
         }
 
@@ -141,7 +154,7 @@ const ReservationModal:
           ) ||
           quantity <= 0
         ) {
-          alert('أدخل كمية حجز صحيحة أكبر من صفر.');
+          showError('أدخل كمية حجز صحيحة أكبر من صفر.');
           return;
         }
 
@@ -149,7 +162,7 @@ const ReservationModal:
           isPieceUnit &&
           !Number.isInteger(quantity)
         ) {
-          alert('حجز الأصناف بالقطعة يجب أن يكون بعدد صحيح من القطع.');
+          showError('حجز الأصناف بالقطعة يجب أن يكون بعدد صحيح من القطع.');
           return;
         }
 
@@ -165,7 +178,7 @@ const ReservationModal:
           Number(editingReservation?.meters || 0);
 
         if (quantity > maxAllowed) {
-          alert(
+          showError(
             `الكمية المطلوبة أكبر من المتوفر. الحد الأقصى ${maxAllowed} ${unitLabel}.`
           );
           return;
@@ -228,6 +241,7 @@ const ReservationModal:
     const handleEdit = (
       reservation: Reservation
     ) => {
+      setErrorMessage('');
       setEditingId(
         reservation.id
       );
@@ -276,6 +290,7 @@ const ReservationModal:
       async () => {
         if (isSaving || showAddForm || confirmDeleteId) return;
 
+        setErrorMessage('');
         setIsSaving(true);
 
         try {
@@ -284,7 +299,7 @@ const ReservationModal:
           );
         } catch (error) {
           console.error('Reservation save failed:', error);
-          alert(
+          showError(
             error instanceof Error && error.message
               ? error.message
               : 'تعذر حفظ الحجوزات. حاول مرة أخرى.'
@@ -304,15 +319,21 @@ const ReservationModal:
             : 'compact'
         }
         desktopMaxWidth="max-w-xl"
-        contentClassName="p-0"
+        contentClassName="app-readable p-0"
       >
         <div
+          onChange={() => setErrorMessage('')}
           className="
             space-y-4
             p-4
             sm:p-6
           "
         >
+          {errorMessage && (
+            <div ref={feedbackRef} tabIndex={-1} className="outline-none">
+              <ActionFeedback tone="error" message={errorMessage} />
+            </div>
+          )}
           <div>
             <h3
               className="

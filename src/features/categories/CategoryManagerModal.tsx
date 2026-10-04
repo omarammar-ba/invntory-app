@@ -43,6 +43,7 @@ import {
 import {
   ResponsiveOverlay,
 } from '@/components/ui/ResponsiveOverlay';
+import { ActionFeedback } from '@/components/ui/ActionFeedback';
 
 interface CategoryManagerModalProps {
   isOpen: boolean;
@@ -1678,6 +1679,7 @@ const CategoryManagerModal:
         }
         mobileSnap="large"
         desktopMaxWidth="max-w-3xl"
+        contentClassName="app-readable p-4 sm:p-6"
       >
         {!isEditing && (
           <div>
@@ -3813,35 +3815,11 @@ const CategoryManagerModal:
               )}
 
               {error && (
-                <p
-                  className="
-                    rounded-[12px]
-                    bg-rose-50
-                    p-2.5
-                    text-xs
-                    font-semibold
-                    text-rose-500
-                    dark:bg-rose-950/40
-                  "
-                >
-                  {error}
-                </p>
+                <ActionFeedback tone="error" message={error} />
               )}
 
               {isSuccess && (
-                <p
-                  className="
-                    rounded-[12px]
-                    bg-emerald-50
-                    p-2.5
-                    text-xs
-                    font-semibold
-                    text-emerald-600
-                    dark:bg-emerald-950/40
-                  "
-                >
-                  تم حفظ القسم بنجاح
-                </p>
+                <ActionFeedback tone="success" message="تم حفظ القسم بنجاح" />
               )}
 
               <div

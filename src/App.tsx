@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/Icons";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import { ElasticScroll } from "@/components/ui/ElasticScroll";
+import { ActionFeedback } from "@/components/ui/ActionFeedback";
 
 import { Login } from "@/features/auth";
 import { Dashboard, SummaryCards } from "@/features/dashboard";
@@ -388,6 +389,13 @@ const App: React.FC = () => {
   ] = useState(false);
 
   const [isTileFormClosing, setIsTileFormClosing] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!actionNotice) return;
+    const timeout = window.setTimeout(() => setActionNotice(null), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [actionNotice]);
 
   const [
     addItemSource,
@@ -1929,6 +1937,7 @@ const App: React.FC = () => {
             }
 
             setIsTileFormClosing(true);
+            setActionNotice('تم حفظ تعديلات الصنف بنجاح.');
 
             void logAction(
               'تعديل',
@@ -2064,6 +2073,7 @@ const App: React.FC = () => {
             }
 
             setIsTileFormClosing(true);
+            setActionNotice('تمت إضافة الصنف بنجاح.');
 
             setActiveCategoryId(
               targetCategory
@@ -2371,6 +2381,7 @@ const App: React.FC = () => {
           setReservingTile(
             null
           );
+          setActionNotice('تم حفظ الحجوزات بنجاح.');
 
           void logAction(
             'حجز',
@@ -3051,6 +3062,7 @@ const App: React.FC = () => {
         >
           <div
             className="
+              app-readable
               flex-1
               max-w-7xl
               w-full
@@ -4028,6 +4040,12 @@ const App: React.FC = () => {
             }
           />
         )}
+
+      {actionNotice && (
+        <div className="pointer-events-none fixed inset-x-4 bottom-24 z-[400] mx-auto max-w-md sm:bottom-6" dir="rtl">
+          <ActionFeedback tone="success" message={actionNotice} className="shadow-lg" />
+        </div>
+      )}
     </div>
   );
 };
