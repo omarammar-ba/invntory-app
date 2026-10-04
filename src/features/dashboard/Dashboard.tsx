@@ -320,30 +320,6 @@ const Dashboard: React.FC<
           راجع المخزون والأقسام
           والحركات من مكان واحد.
         </p>
-
-
-        {isSyncing && (
-          <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/75 px-2.5 py-1 text-[10px] font-semibold text-slate-500 shadow-sm dark:border-white/[0.06] dark:bg-neutral-900/75 dark:text-slate-400">
-            <div className="flex items-center gap-1" aria-hidden="true">
-              <span className="flex h-5 w-5 animate-pulse items-center justify-center rounded-md border border-slate-200/70 bg-slate-100/70 text-slate-400 dark:border-white/[0.06] dark:bg-white/[0.05] dark:text-slate-500">
-                <Layers3 size={10} strokeWidth={2.2} />
-              </span>
-              <span
-                className="flex h-5 w-5 animate-pulse items-center justify-center rounded-md border border-slate-200/70 bg-slate-100/70 text-slate-400 dark:border-white/[0.06] dark:bg-white/[0.05] dark:text-slate-500"
-                style={{ animationDelay: '140ms' }}
-              >
-                <PackageOpen size={10} strokeWidth={2.2} />
-              </span>
-              <span
-                className="flex h-5 w-5 animate-pulse items-center justify-center rounded-md border border-slate-200/70 bg-slate-100/70 text-slate-400 dark:border-white/[0.06] dark:bg-white/[0.05] dark:text-slate-500"
-                style={{ animationDelay: '280ms' }}
-              >
-                <Search size={10} strokeWidth={2.2} />
-              </span>
-            </div>
-            جاري تحديث بقية المخزون...
-          </div>
-        )}
       </motion.div>
 
       <motion.form
@@ -590,13 +566,15 @@ const Dashboard: React.FC<
           className="
             mb-2
             flex
+            min-h-7
             items-center
-            justify-between
+            gap-2
           "
         >
           <h2
             className="
               text-base
+              shrink-0
               font-bold
               text-slate-900
               dark:text-white
@@ -605,6 +583,17 @@ const Dashboard: React.FC<
           >
             الأقسام
           </h2>
+
+          <div className="flex h-7 min-w-0 flex-1 items-center justify-center">
+            {isSyncing && (
+              <div role="status" className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full border border-slate-200/70 bg-white/75 px-2 py-0.5 text-[10px] font-semibold leading-5 text-slate-500 shadow-sm dark:border-white/[0.06] dark:bg-neutral-900/75 dark:text-slate-400">
+                <span className="flex h-5 w-5 shrink-0 animate-pulse items-center justify-center rounded-md border border-slate-200/70 bg-slate-100/70 text-slate-400 dark:border-white/[0.06] dark:bg-white/[0.05] dark:text-slate-500" aria-hidden="true">
+                  <Layers3 size={10} strokeWidth={2.2} />
+                </span>
+                <span className="min-w-0 truncate">جاري تحديث بقية المخزون...</span>
+              </div>
+            )}
+          </div>
 
           <button
             type="button"
@@ -615,6 +604,7 @@ const Dashboard: React.FC<
             }
             className="
               flex
+              shrink-0
               items-center
               gap-1
               text-[11px]
