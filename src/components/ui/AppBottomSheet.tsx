@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'motion/react';
 import { X as CloseIcon } from 'lucide-react';
 
 export type AppBottomSheetSnap = 'compact' | 'large' | 'expanded';
@@ -31,6 +31,7 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
   contentClassName = 'p-4',
 }) => {
   const prefersReducedMotion = useReducedMotion();
+  const dragControls = useDragControls();
   const [snap, setSnap] = useState<AppBottomSheetSnap>(initialSnap);
   const [isPresent, setIsPresent] = useState(open);
 
@@ -148,6 +149,13 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
             role="dialog"
             aria-modal="true"
             aria-label={title || 'نافذة'}
+            drag="y"
+            dragControls={dragControls}
+            dragListener={false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={0.18}
+            dragMomentum={false}
+            onDragEnd={handleDragEnd}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -172,18 +180,18 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
             "
             style={{
               height: SNAP_HEIGHTS[snap],
+              transition: prefersReducedMotion
+                ? undefined
+                : 'height 280ms cubic-bezier(0.22, 1, 0.36, 1)',
               WebkitBackfaceVisibility: 'hidden',
               backfaceVisibility: 'hidden',
             }}
           >
-            <motion.div
-              drag="y"
-              dragConstraints={{
-                top: 0,
-                bottom: 0,
+            <div
+              onPointerDown={event => {
+                event.currentTarget.setPointerCapture(event.pointerId);
+                if (!prefersReducedMotion) dragControls.start(event);
               }}
-              dragElastic={0.18}
-              onDragEnd={handleDragEnd}
               className="
                 shrink-0
                 touch-none
@@ -263,7 +271,7 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
                   <CloseIcon className="h-4 w-4" />
                 </button>
               </div>
-            </motion.div>
+            </div>
 
             <div
               className={`
