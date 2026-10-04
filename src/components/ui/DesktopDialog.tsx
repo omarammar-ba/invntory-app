@@ -91,6 +91,7 @@ export const DesktopDialog: React.FC<DesktopDialogProps> = ({
         >
           <motion.button
             type="button"
+            data-overlay-backdrop
             aria-label="إغلاق النافذة"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

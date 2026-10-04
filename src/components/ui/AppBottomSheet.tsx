@@ -125,12 +125,13 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
         >
           <motion.button
             type="button"
+            data-overlay-backdrop
             aria-label="إغلاق النافذة"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{
-              duration: prefersReducedMotion ? 0 : 0.16,
+              duration: prefersReducedMotion ? 0 : 0.28,
             }}
             onClick={onClose}
             className="

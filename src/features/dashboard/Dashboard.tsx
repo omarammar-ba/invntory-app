@@ -217,51 +217,38 @@ const Dashboard: React.FC<
     currentStaff?.name ||
     'المستخدم';
 
-  const totalItemsCount =
-    safeTiles.length;
+  const inventorySummary = useMemo(() => {
+    const byCategory = new Map<string, { count: number; quantity: number }>();
+    let totalQuantity = 0;
+    let reservationCount = 0;
+    let lowStockCount = 0;
 
-  const totalQuantitySum =
-    safeTiles.reduce(
-      (sum, item) =>
-        sum +
-        (Number(item.meters) ||
-          0),
-      0,
-    );
+    for (const item of safeTiles) {
+      const quantity = Number(item.meters) || 0;
+      totalQuantity += quantity;
+      reservationCount += item.reservations?.length || 0;
 
-  const activeReservationsCount =
-    Array.isArray(
-      allReservations,
-    )
-      ? allReservations.length
-      : safeTiles.reduce(
-          (sum, item) =>
-            sum +
-            (item.reservations
-              ?.length || 0),
-          0,
-        );
+      const alertLimit = (item as any).lowStockAlert !== undefined
+        ? Number((item as any).lowStockAlert)
+        : 10;
+      if (quantity > 0 && quantity <= alertLimit) lowStockCount += 1;
 
-  const lowStockCount =
-    safeTiles.filter(item => {
-      const qty =
-        Number(item.meters) || 0;
+      const categoryId = item.categoryId;
+      const categorySummary = byCategory.get(categoryId) || { count: 0, quantity: 0 };
+      categorySummary.count += 1;
+      categorySummary.quantity += quantity;
+      byCategory.set(categoryId, categorySummary);
+    }
 
-      const alertLimit =
-        (item as any)
-          .lowStockAlert !==
-        undefined
-          ? Number(
-              (item as any)
-                .lowStockAlert,
-            )
-          : 10;
+    return { byCategory, totalQuantity, reservationCount, lowStockCount };
+  }, [safeTiles]);
 
-      return (
-        qty > 0 &&
-        qty <= alertLimit
-      );
-    }).length;
+  const totalItemsCount = safeTiles.length;
+  const totalQuantitySum = inventorySummary.totalQuantity;
+  const activeReservationsCount = Array.isArray(allReservations)
+    ? allReservations.length
+    : inventorySummary.reservationCount;
+  const lowStockCount = inventorySummary.lowStockCount;
 
   const handleSearchSubmit = (
     event: React.FormEvent,
@@ -659,7 +646,7 @@ const Dashboard: React.FC<
             dark:bg-neutral-900
             dark:divide-white/[0.05]
             ${dashboardCategories.length > 4
-              ? 'max-h-[280px] overflow-y-auto overscroll-contain custom-scrollbar'
+              ? 'max-h-[280px] overflow-y-auto custom-scrollbar'
               : 'overflow-hidden'}
           `}
         >
@@ -668,12 +655,7 @@ const Dashboard: React.FC<
               category,
               index,
             ) => {
-              const categoryItems =
-                safeTiles.filter(
-                  item =>
-                    item.categoryId ===
-                    category.id,
-                );
+              const categorySummary = inventorySummary.byCategory.get(category.id);
 
               const visual =
                 getCategoryVisual(
@@ -688,22 +670,10 @@ const Dashboard: React.FC<
                 category.defaultUnit ===
                 'pieces';
 
-              const totalQty =
-                categoryItems.reduce(
-                  (
-                    sum,
-                    item,
-                  ) =>
-                    sum +
-                    (Number(
-                      item.meters,
-                    ) || 0),
-                  0,
-                );
+              const totalQty = categorySummary?.quantity || 0;
 
               return (
                 <motion.button
-                  layout
                   key={
                     category.id
                   }
@@ -800,7 +770,7 @@ const Dashboard: React.FC<
                         dark:text-slate-200
                       "
                     >
-                      {categoryItems.length}{' '}
+                      {categorySummary?.count || 0}{' '}
                       صنف
                     </div>
 

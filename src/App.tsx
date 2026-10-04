@@ -1217,7 +1217,9 @@ const App: React.FC = () => {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
+    let idleCallbackId: number | null = null;
+    let fallbackTimeoutId: number | null = null;
+    const saveCache = () => {
       writeInventoryUiCache(user.uid, currentStaff.role, {
         porcelainTiles,
         ceramicTiles,
@@ -1225,9 +1227,22 @@ const App: React.FC = () => {
         categories,
         logs,
       });
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      const scheduleIdle = window.requestIdleCallback;
+      if (typeof scheduleIdle === 'function') {
+        idleCallbackId = scheduleIdle.call(window, saveCache, { timeout: 5000 });
+      } else {
+        fallbackTimeoutId = window.setTimeout(saveCache, 250);
+      }
     }, INVENTORY_CACHE_WRITE_DELAY_MS);
 
-    return () => window.clearTimeout(timeoutId);
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (idleCallbackId !== null) window.cancelIdleCallback(idleCallbackId);
+      if (fallbackTimeoutId !== null) window.clearTimeout(fallbackTimeoutId);
+    };
   }, [
     user,
     currentStaff,

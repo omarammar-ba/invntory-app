@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { ShieldCheck, UserCheck, Menu } from '../ui/AppIcons';
 import { StaffMember } from '../../types';
 
@@ -15,10 +15,34 @@ const Header: React.FC<HeaderProps> = ({
   currentStaff,
 }) => {
   const isAdmin = currentStaff?.role === 'admin';
+  const headerRef = useRef<HTMLElement>(null);
+  const spacerRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    const spacer = spacerRef.current;
+    if (!header || !spacer) return;
+
+    const keepContentBelowHeader = () => {
+      spacer.style.height = `${header.getBoundingClientRect().height}px`;
+    };
+
+    keepContentBelowHeader();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', keepContentBelowHeader);
+      return () => window.removeEventListener('resize', keepContentBelowHeader);
+    }
+
+    const observer = new ResizeObserver(keepContentBelowHeader);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
 
   return (
+    <>
     <header
-      className="app-safe-top sticky top-0 z-40 flex w-full items-center justify-between gap-3 border-b border-slate-200/60 bg-white/80 md:bg-slate-50/90 px-4 py-3 shadow-xs backdrop-blur-md transition-all dark:border-white/[0.06] dark:bg-black/80 sm:px-6 sm:py-3.5"
+      ref={headerRef}
+      className="app-safe-top fixed top-0 left-0 right-0 md:right-64 z-40 flex items-center justify-between gap-3 border-b border-slate-200/60 bg-white/80 md:bg-slate-50/90 px-4 py-3 shadow-xs backdrop-blur-md transition-all dark:border-white/[0.06] dark:bg-black/80 sm:px-6 sm:py-3.5"
       dir="rtl"
     >
       <div className="relative z-10 flex min-w-0 items-center gap-3">
@@ -50,6 +74,8 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       )}
     </header>
+    <div ref={spacerRef} aria-hidden="true" className="shrink-0" />
+    </>
   );
 };
 
