@@ -676,6 +676,8 @@ html,
 body {
   min-height: 100dvh;
   background-color: var(--surface-page);
+  /* Keep native scrolling while preventing touch gestures from zooming the page. */
+  touch-action: pan-x pan-y;
   /* Keep the browser's native edge motion without triggering page refresh. */
   overscroll-behavior-y: contain;
 }
