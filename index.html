@@ -6,7 +6,15 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#f9fbfd" />
+    <script>
+      // Match the saved appearance before the first splash frame is painted.
+      try {
+        const dark = localStorage.getItem('app_theme') === 'dark';
+        document.documentElement.classList.toggle('dark', dark);
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#080808' : '#f9fbfd');
+      } catch { /* Keep the light fallback when storage is restricted. */ }
+    </script>
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -17,17 +25,11 @@
 
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="preload" as="image" href="/icons/icon-192.png" />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/cairo-arabic-wght-normal.woff2" crossorigin />
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
 
     <title>إدارة مخزون</title>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
-      rel="stylesheet"
-    />
 
     <style>
       :root { color-scheme: light; }
@@ -283,32 +285,27 @@
         }
       }
     </style>
+
+    <style>
+      html.app-launching, html.app-launching body { background: #f9fbfd; }
+      #app-launch-splash { background: #f9fbfd; color: #1a2738; transition: opacity 160ms ease, visibility 160ms ease; }
+      #app-launch-splash::after { display: none; }
+      .startup-content { text-align: center; display: flex; flex-direction: column; align-items: center; }
+      .startup-content > img { width: 84px; height: 84px; border-radius: 24px; }
+      .startup-content h1 { margin: 20px 0 8px; font-size: 25px; line-height: 1.7; font-weight: 650; }
+      .startup-content p { margin: 0; color: #62738a; font-size: 13px; line-height: 1.8; }
+      .startup-progress { position: relative; direction: ltr; display: block; width: 108px; height: 3px; margin-top: 24px; border-radius: 3px; overflow: hidden; background: #dce8f4; }
+      .startup-progress > span { position: absolute; inset: 0 auto 0 0; display: block; height: 100%; width: 42%; background: #1268da; border-radius: inherit; animation: startup-stream 1.6s cubic-bezier(.4, 0, .25, 1) infinite; }
+      .startup-credit { position: absolute; bottom: max(28px, env(safe-area-inset-bottom)); width: 120px; height: auto; }
+      @keyframes startup-stream { 0% { transform: translateX(-115%) scaleX(.65); } 50% { transform: translateX(105%) scaleX(1.2); } 100% { transform: translateX(355%) scaleX(.65); } }
+      @media (prefers-reduced-motion: reduce) { .startup-progress > span { animation: none; left: 29%; transform: none; } }
+      html.dark #app-launch-splash { background: #080808; color: #f2f2f3; }
+    </style>
   </head>
   <body>
-    <div id="app-launch-splash" role="status" aria-live="polite" aria-label="جاري تشغيل تطبيق إدارة مخزون">
-      <div class="app-launch-splash__content">
-        <div class="app-launch-splash__logo-shell">
-          <img class="app-launch-splash__logo" src="/icons/icon-192.png" alt="" />
-        </div>
-        <h1 class="app-launch-splash__title">إدارة مخزون</h1>
-        <p class="app-launch-splash__subtitle">مخزونك جاهز بين إيديك</p>
-        <div class="app-launch-splash__glyphs" aria-hidden="true">
-          <span class="app-launch-splash__glyph">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>
-          </span>
-          <span class="app-launch-splash__glyph">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18"/><path d="M3 12h18"/><path d="M3 17h18"/></svg>
-          </span>
-          <span class="app-launch-splash__glyph">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          </span>
-        </div>
-      </div>
-
-      <div class="app-launch-splash__credit" aria-label="من إعداد شركة Dollarix Studio">
-        <span>من إعداد شركة</span>
-        <img class="app-launch-splash__credit-logo" src="/branding/dollarix-studio.png?v=white-logo" alt="Dollarix Studio" />
-      </div>
+    <div id="app-launch-splash" role="status" aria-live="polite" aria-label="جارٍ تشغيل إدارة مخزون">
+      <div class="startup-content"><img src="/icons/icon-192.png" width="84" height="84" alt="" /><h1>إدارة مخزون</h1><p id="app-launch-status">جارٍ تشغيل التطبيق…</p><span class="startup-progress" aria-hidden="true"><span></span></span></div>
+      <img class="startup-credit" src="/branding/dollarix-studio-color.png" alt="Dollarix Studio" />
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

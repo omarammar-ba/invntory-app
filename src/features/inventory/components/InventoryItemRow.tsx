@@ -111,9 +111,9 @@ const ActionRail: React.FC<ActionRailProps> = ({
         onClick={() => run(() => onEdit(item))}
         className="
           flex w-12 flex-col items-center justify-center gap-1
-          bg-slate-700 text-[8px] font-bold text-white
-          transition active:bg-slate-800
-          dark:bg-slate-600 dark:active:bg-slate-700
+          bg-blue-600 text-[10px] font-bold text-white
+          transition active:bg-blue-700
+          dark:bg-blue-700 dark:active:bg-blue-800
         "
         aria-label={`تعديل ${item.name}`}
       >
@@ -294,7 +294,7 @@ const InventoryItemRowComponent: React.FC<InventoryItemRowProps> = ({
 
   return (
     <article
-      className="relative overflow-hidden bg-slate-100 dark:bg-neutral-800"
+      className="atelier-stock-row relative overflow-hidden bg-slate-100 dark:bg-neutral-800"
       dir="rtl"
     >
       <ActionRail
@@ -337,7 +337,7 @@ const InventoryItemRowComponent: React.FC<InventoryItemRowProps> = ({
         }
         onClick={handleContentClick}
         className="
-          relative z-10 flex min-h-[72px] items-center gap-2.5
+          atelier-stock-content relative z-10 flex min-h-[72px] items-center gap-2.5
           bg-white px-2.5 py-2 dark:bg-neutral-900
         "
       >

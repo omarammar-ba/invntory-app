@@ -319,7 +319,7 @@ const ReservationModal:
             : 'compact'
         }
         desktopMaxWidth="max-w-xl"
-        contentClassName="app-readable p-0"
+        contentClassName="workspace-admin reservation-workspace app-readable p-0"
       >
         <div
           onChange={() => setErrorMessage('')}
@@ -752,7 +752,7 @@ const ReservationModal:
                   transition
                   hover:bg-indigo-700
                   active:scale-[0.98]
-                "
+                " data-ui="primary"
               >
                 {editingId
                   ? 'حفظ تعديل الحجز'
@@ -803,7 +803,7 @@ const ReservationModal:
                   active:scale-[0.98]
                   dark:bg-white
                   dark:text-slate-900
-                "
+                " data-ui="primary"
               >
                 <Plus
                   className="
@@ -1159,7 +1159,7 @@ const ReservationModal:
               active:scale-[0.98]
               disabled:cursor-not-allowed
               disabled:opacity-60
-            "
+            " data-ui="primary"
           >
             <SaveIcon />
             {isSaving

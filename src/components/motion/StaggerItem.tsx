@@ -13,6 +13,13 @@ interface Props {
 export function StaggerItem({ children, index, maxAnimatedItems = 8, className = '', as = 'div' }: Props) {
   const reduceMotion = useReducedMotion();
 
+  // Rows beyond the entrance sequence do not need a motion wrapper at all.
+  // This keeps long inventory tables cheap while retaining the same elements.
+  if (reduceMotion || index >= maxAnimatedItems) {
+    const Element = as;
+    return <Element className={className}>{children}</Element>;
+  }
+
   const delay = reduceMotion
     ? 0
     : index < maxAnimatedItems

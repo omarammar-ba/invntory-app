@@ -16,17 +16,8 @@ export default defineConfig({
     port: 3000,
   },
   build: {
-    // رفع حد التنبيه إلى 1600 كيلوبايت لمنع ظهور الرسالة الصفراء
-    chunkSizeWarningLimit: 1600,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          // فصل مكتبات النظام عن كود التطبيق لتسريع التحميل
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-        },
-      },
-    },
+    // Keep Vite's dynamic import boundaries: PDF export is requested on demand.
+    // A single forced vendor chunk also pulled PDF rendering into first load.
+    manifest: true,
   },
 });

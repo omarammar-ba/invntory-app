@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'inventory-app-v9';
+const CACHE_VERSION = 'inventory-app-v15-refined-interactions';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {

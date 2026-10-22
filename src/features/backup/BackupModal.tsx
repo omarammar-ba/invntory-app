@@ -174,7 +174,7 @@ const BackupModal: React.FC<BackupModalProps> = ({
   };
 
   const content = (
-    <div className="app-readable space-y-4" dir="rtl">
+    <div className="workspace-admin app-readable space-y-4" data-workspace-page={isPage || undefined} dir="rtl">
       {successMessage && (
         <ActionFeedback tone="success" message={successMessage} />
       )}
@@ -208,7 +208,7 @@ const BackupModal: React.FC<BackupModalProps> = ({
             type="button"
             onClick={handleExportBackup}
             disabled={!canUseBackup || isExporting}
-            className="h-9 shrink-0 rounded-[10px] bg-slate-900 px-3 text-[10px] font-bold text-white transition active:scale-[0.98] disabled:opacity-50 dark:bg-white dark:text-slate-900"
+            className="h-9 shrink-0 rounded-[10px] bg-slate-900 px-3 text-[10px] font-bold text-white transition active:scale-[0.98] disabled:opacity-50 dark:bg-white dark:text-slate-900" data-ui="primary"
           >
             {isExporting ? 'جاري التجهيز...' : 'تحميل'}
           </button>
@@ -263,7 +263,7 @@ const BackupModal: React.FC<BackupModalProps> = ({
       title="مراجعة النسخة الاحتياطية"
       mobileSnap="large"
       desktopMaxWidth="max-w-lg"
-      contentClassName="p-4"
+      contentClassName="workspace-admin p-4"
     >
       {previewBackup && (
         <div className="space-y-4" dir="rtl">
@@ -314,7 +314,7 @@ const BackupModal: React.FC<BackupModalProps> = ({
             type="button"
             onClick={handleConfirmRestore}
             disabled={isImporting}
-            className="h-11 w-full rounded-[12px] bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50"
+            className="h-11 w-full rounded-[12px] bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50" data-ui="primary"
           >
             {isImporting ? 'جاري الدمج...' : 'دمج النسخة'}
           </button>
@@ -336,7 +336,7 @@ const BackupModal: React.FC<BackupModalProps> = ({
     <>
       {!previewBackup && (
       <MotionModal
-        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-[22px] border border-slate-200/70 bg-slate-50 shadow-2xl dark:border-white/[0.07] dark:bg-neutral-950"
+        className="workspace-admin-dialog flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-[22px] border border-slate-200/70 bg-slate-50 shadow-2xl dark:border-white/[0.07] dark:bg-neutral-950"
         backdropClassName="fixed inset-0 z-[290] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
       >
         <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 bg-white px-4 py-3.5 dark:border-white/[0.06] dark:bg-neutral-900" dir="rtl">

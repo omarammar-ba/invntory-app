@@ -12,6 +12,7 @@ export interface AppBottomSheetProps {
   title?: string;
   initialSnap?: AppBottomSheetSnap;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   contentClassName?: string;
 }
 
@@ -28,6 +29,7 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
   title,
   initialSnap = 'expanded',
   children,
+  footer,
   contentClassName = 'p-4',
 }) => {
   const prefersReducedMotion = useReducedMotion();
@@ -160,7 +162,7 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={springConfig}
-            className="
+            className="workspace-overlay 
               absolute
               inset-x-0
               bottom-0
@@ -289,6 +291,7 @@ export const AppBottomSheet: React.FC<AppBottomSheetProps> = ({
             >
               {children}
             </div>
+            {footer && <div className="shrink-0">{footer}</div>}
           </motion.section>
         </motion.div>
       )}

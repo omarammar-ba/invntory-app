@@ -115,16 +115,16 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   return (
     <div
-      className="app-viewport app-safe-screen flex w-full items-center justify-center bg-slate-100/70 p-4 text-slate-900 transition-colors dark:bg-neutral-950 dark:text-slate-100 sm:p-6"
+      className="workspace-login app-viewport app-safe-screen flex w-full items-center justify-center bg-slate-100/70 p-4 text-slate-900 transition-colors dark:bg-neutral-950 dark:text-slate-100 sm:p-6"
       dir="rtl"
     >
       <div className="relative z-10 my-auto w-full max-w-md animate-fade-in">
-        <div className="relative overflow-hidden rounded-[22px] border border-slate-200/80 bg-white p-6 shadow-xl shadow-slate-200/40 transition-all dark:border-white/[0.07] dark:bg-neutral-900 dark:shadow-none sm:p-8">
-          <div className="absolute inset-x-0 top-0 h-1 bg-slate-900 dark:bg-white/15" />
+        <div className="login-surface relative overflow-hidden rounded-[22px] border border-slate-200/80 bg-white p-6 shadow-xl shadow-slate-200/40 transition-all dark:border-white/[0.07] dark:bg-neutral-900 dark:shadow-none sm:p-8">
+          
 
-          <div className="mb-7 text-center">
+          <div className="login-heading mb-7 text-center">
             <div className="mb-3.5 inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-white shadow-xs dark:border-white/[0.08] dark:bg-neutral-800">
-              <Layers className="h-7 w-7" />
+              <img src="/icons/icon-192.png" alt="شعار إدارة مخزون" className="login-app-logo" width="80" height="80" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">إدارة مخزون</h1>
             <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400 sm:text-sm">
@@ -188,6 +188,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
             <button
               type="submit"
+              data-ui="primary"
               disabled={loading || !isFirebaseConfigured || lockedSeconds > 0}
               className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-bold text-white shadow-sm transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 sm:py-3.5 sm:text-sm"
             >

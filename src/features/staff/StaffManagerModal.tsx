@@ -601,7 +601,7 @@ const StaffManagerModal:
 
     const content = (
       <div
-        className="app-readable space-y-4"
+        className="workspace-admin app-readable space-y-4" data-workspace-page={isPage || undefined}
         dir="rtl"
       >
         {successMessage && (
@@ -759,7 +759,7 @@ const StaffManagerModal:
               <button
                 type="submit"
                 disabled={isSavingStaff}
-                className="flex h-10 items-center justify-center gap-1.5 rounded-[12px] bg-slate-900 px-5 text-xs font-bold text-white shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900"
+                className="flex h-10 items-center justify-center gap-1.5 rounded-[12px] bg-slate-900 px-5 text-xs font-bold text-white shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900" data-ui="primary"
               >
                 <CheckIcon className="h-4 w-4" />
                 {isSavingStaff ? 'جاري الحفظ...' : editingStaffId ? 'حفظ التعديل' : 'حفظ الموظف'}
@@ -785,7 +785,7 @@ const StaffManagerModal:
               <button
                 type="button"
                 onClick={() => setIsAdding(true)}
-                className="flex h-10 items-center gap-2 rounded-[12px] bg-slate-900 px-4 text-[11px] font-bold text-white shadow-sm transition active:scale-[0.98] dark:bg-white dark:text-slate-900"
+                className="flex h-10 items-center gap-2 rounded-[12px] bg-slate-900 px-4 text-[11px] font-bold text-white shadow-sm transition active:scale-[0.98] dark:bg-white dark:text-slate-900" data-ui="primary"
               >
                 <UserPlusIcon className="h-4 w-4" />
                 إضافة موظف
@@ -859,7 +859,7 @@ const StaffManagerModal:
 
     return (
       <MotionModal
-        className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-[22px] border border-slate-200/70 bg-slate-50 shadow-2xl dark:border-white/[0.07] dark:bg-neutral-950"
+        className="workspace-admin-dialog flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-[22px] border border-slate-200/70 bg-slate-50 shadow-2xl dark:border-white/[0.07] dark:bg-neutral-950"
         backdropClassName="fixed inset-0 z-[280] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
       >
         <div className="flex items-center justify-between gap-3 border-b border-slate-200/70 bg-white px-4 py-3.5 dark:border-white/[0.06] dark:bg-neutral-900">

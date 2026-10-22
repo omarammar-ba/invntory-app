@@ -207,18 +207,18 @@ export const FullListModal:
         open={isOpen}
         onClose={onClose}
         title={`المخزون الكامل - ${category.name}`}
-        mobileSnap="large"
+        mobileSnap="expanded"
         desktopMaxWidth="max-w-5xl"
-        contentClassName="app-readable p-0"
+        contentClassName="atelier-full-list app-readable p-0"
       >
-        <div className="min-h-full bg-slate-50/40 dark:bg-neutral-950/20">
-          <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/95 px-3 py-3 backdrop-blur-md dark:border-white/[0.06] dark:bg-neutral-900/95 sm:px-5">
+        <div className="full-list-surface min-h-full">
+          <div className="full-list-search sticky top-0 z-20 border-b border-slate-200/70 bg-white/95 px-3 py-3 backdrop-blur-md dark:border-white/[0.06] dark:bg-neutral-900/95 sm:px-5">
             <div className="flex items-center gap-2.5">
               <div className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
                 <input
-                  type="text"
+                  type="search" enterKeyHint="search" autoComplete="off" aria-label="البحث في قائمة الأصناف"
                   value={
                     search
                   }

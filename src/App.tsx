@@ -4,13 +4,15 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
+  useRef,
 } from 'react';
-import { motion, LayoutGroup } from 'motion/react';
-import { CATEGORY_ACCENTS, springTransition } from '@/styles/motion';
+import { flushSync } from 'react-dom';
 
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import BottomNav from "@/components/layout/BottomNav";
+import InventoryWorkspace from "@/features/inventory/InventoryWorkspace";
+import StartupScreen from "@/components/ui/StartupScreen";
 import {
   ListIcon,
   HomeIcon,
@@ -26,11 +28,10 @@ import { ElasticScroll } from "@/components/ui/ElasticScroll";
 import { ActionFeedback } from "@/components/ui/ActionFeedback";
 
 import { Login } from "@/features/auth";
-import { Dashboard, SummaryCards } from "@/features/dashboard";
+import { Dashboard } from "@/features/dashboard";
 import {
   TileList,
   TileForm,
-  SearchFilter,
   ImageModal,
   ReservationModal,
   FullListModal,
@@ -326,6 +327,9 @@ const App: React.FC = () => {
   );
 
 
+  const [initialInventoryReady, setInitialInventoryReady] = useState(false);
+  const [startupWaitExpired, setStartupWaitExpired] = useState(false);
+
   const [
     inventoryRefreshVersion,
     setInventoryRefreshVersion
@@ -390,6 +394,9 @@ const App: React.FC = () => {
 
   const [isTileFormClosing, setIsTileFormClosing] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const homeSearchInputRef = useRef<HTMLInputElement>(null);
+  const [homeVisitKey, setHomeVisitKey] = useState(0);
+  const [isHomeSearching, setIsHomeSearching] = useState(false);
 
   useEffect(() => {
     if (!actionNotice) return;
@@ -478,6 +485,8 @@ const App: React.FC = () => {
   const clearSecuritySensitiveState =
     useCallback(
       () => {
+        setInitialInventoryReady(false);
+        setStartupWaitExpired(false);
         setPorcelainTiles([]);
         setCeramicTiles([]);
         setOtherItems([]);
@@ -493,22 +502,34 @@ const App: React.FC = () => {
 
 
   useEffect(() => {
-    if (authLoading) return;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isDarkMode ? '#080808' : '#f9fbfd');
+  }, [isDarkMode]);
 
-    const launchSplash = document.getElementById('app-launch-splash');
-    if (!launchSplash) {
-      document.documentElement.classList.remove('app-launching');
-      return;
-    }
+  // Decorative CSS layers pause off-screen; inventory subscriptions stay unchanged.
+  useEffect(() => {
+    const syncMotion = () => document.documentElement.toggleAttribute('data-ui-paused', document.hidden);
+    syncMotion();
+    document.addEventListener('visibilitychange', syncMotion);
+    return () => { document.removeEventListener('visibilitychange', syncMotion); document.documentElement.removeAttribute('data-ui-paused'); };
+  }, []);
 
-    launchSplash.classList.add('app-launch-splash--hidden');
-    const removeTimer = window.setTimeout(() => {
-      launchSplash.remove();
-      document.documentElement.classList.remove('app-launching');
-    }, 320);
+  const startupReady = !authLoading && (!user || !currentStaff || (categoriesReady && (initialInventoryReady || startupWaitExpired)));
+  useEffect(() => {
+    if (startupReady) return;
+    const timer = window.setTimeout(() => setStartupWaitExpired(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [startupReady, user?.uid]);
 
-    return () => window.clearTimeout(removeTimer);
-  }, [authLoading]);
+  useEffect(() => {
+    const splash = document.getElementById('app-launch-splash');
+    const label = document.getElementById('app-launch-status');
+    if (label) label.textContent = authLoading ? 'جارٍ التحقق من الحساب…' : startupWaitExpired ? 'الاتصال يأخذ وقتًا أطول من المعتاد…' : 'جارٍ تحضير المخزون…';
+    if (!startupReady && !startupWaitExpired) return;
+    if (!splash) { document.documentElement.classList.remove('app-launching'); return; }
+    splash.classList.add('app-launch-splash--hidden');
+    const timer = window.setTimeout(() => { splash.remove(); document.documentElement.classList.remove('app-launching'); }, 180);
+    return () => window.clearTimeout(timer);
+  }, [startupReady, authLoading, startupWaitExpired]);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -578,6 +599,7 @@ const App: React.FC = () => {
           setOtherItems(cachedUi.otherItems);
           setCategories(cachedUi.categories);
           setLogs(cachedUi.logs);
+          setInitialInventoryReady(true);
         }
 
         setCurrentStaff(activeStaff);
@@ -761,7 +783,7 @@ const App: React.FC = () => {
       : ref.where('visibleToEmployees', '==', true).onSnapshot(handleCategories, handleCategoryError);
 
     return () => unsubscribe?.();
-  }, [user, currentStaff]);
+  }, [user?.uid, currentStaff?.id, currentStaff?.role, currentStaff?.status]);
 
   const visibleCategoryIdsString =
     useMemo(
@@ -819,7 +841,6 @@ const App: React.FC = () => {
     }
 
     let cancelled = false;
-    const unsubs: (() => void)[] = [];
     const isAdmin = currentStaff.role === 'admin';
     const visibleCategoryIds = new Set<string>(
       visibleCategoryIdsString.split(',').filter(Boolean)
@@ -1041,9 +1062,28 @@ const App: React.FC = () => {
     }
 
     void Promise.allSettled(inventoryLoads).then(() => {
-      if (!cancelled) setLoading(false);
+      if (!cancelled) { setLoading(false); setInitialInventoryReady(true); }
     });
 
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    user?.uid,
+    currentStaff?.id,
+    currentStaff?.role,
+    currentStaff?.status,
+    categoriesReady,
+    visibleCategoryIdsString,
+    inventoryRefreshVersion
+  ]);
+
+  useEffect(() => {
+    if (!user || !currentStaff || !categoriesReady) return;
+    let cancelled = false;
+    const unsubs: (() => void)[] = [];
+    const isAdmin = currentStaff.role === 'admin';
+    const visibleCategoryIds = new Set(visibleCategoryIdsString.split(',').filter(Boolean));
     // Logs stay realtime because only the newest 100 records are subscribed.
     if (isAdmin) {
       unsubs.push(
@@ -1203,17 +1243,8 @@ const App: React.FC = () => {
       if (visibleCategoryIds.size === 0) setLogs([]);
     }
 
-    return () => {
-      cancelled = true;
-      unsubs.forEach(unsubscribe => unsubscribe?.());
-    };
-  }, [
-    user,
-    currentStaff,
-    categoriesReady,
-    visibleCategoryIdsString,
-    inventoryRefreshVersion
-  ]);
+    return () => { cancelled = true; unsubs.forEach(unsubscribe => unsubscribe?.()); };
+  }, [user?.uid, currentStaff?.id, currentStaff?.role, currentStaff?.status, categoriesReady, visibleCategoryIdsString]);
 
   useEffect(() => {
     if (
@@ -1266,23 +1297,17 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user || !currentStaff) return;
 
-    let lastRefreshAt = Date.now();
+    let hiddenAt: number | null = null;
     const refreshWhenReturning = () => {
-      if (document.visibilityState !== 'visible') return;
-      const now = Date.now();
-      if (now - lastRefreshAt < RETURN_REFRESH_MIN_INTERVAL_MS) return;
-      lastRefreshAt = now;
-      setInventoryRefreshVersion(previous => previous + 1);
+      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+      if (document.visibilityState !== 'visible' || hiddenAt === null) return;
+      const elapsed = Date.now() - hiddenAt;
+      hiddenAt = null;
+      if (elapsed >= RETURN_REFRESH_MIN_INTERVAL_MS) setInventoryRefreshVersion(previous => previous + 1);
     };
-
-    window.addEventListener('focus', refreshWhenReturning);
     document.addEventListener('visibilitychange', refreshWhenReturning);
-
-    return () => {
-      window.removeEventListener('focus', refreshWhenReturning);
-      document.removeEventListener('visibilitychange', refreshWhenReturning);
-    };
-  }, [user, currentStaff]);
+    return () => document.removeEventListener('visibilitychange', refreshWhenReturning);
+  }, [user?.uid, currentStaff?.id, currentStaff?.role]);
 
   const isEmployee =
     currentStaff?.role ===
@@ -2828,60 +2853,8 @@ const App: React.FC = () => {
     }
   }, [loading, pendingInventoryAction, inventorySyncError]);
 
-  if (
-    authLoading
-  ) {
-    // React fallback for direct/dev loads. In production the matching HTML
-    // splash is already visible before the JavaScript bundle finishes loading.
-    return (
-      <div
-        className="app-viewport relative flex items-center justify-center overflow-hidden bg-[linear-gradient(145deg,#0f172a_0%,#172554_46%,#3730a3_84%,#3730a3_100%)] px-6 text-white"
-        dir="rtl"
-        role="status"
-        aria-live="polite"
-      >
-        <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-blue-400/15 blur-3xl" />
-        <div className="absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-violet-400/15 blur-3xl" />
-
-        <div className="relative flex flex-col items-center text-center">
-          <div className="mb-5 rounded-[26px] border border-white/20 bg-white/10 p-2.5 shadow-2xl shadow-black/20 backdrop-blur-md">
-            <img
-              src="/icons/icon-192.png"
-              alt=""
-              className="h-20 w-20 rounded-[20px] shadow-lg"
-            />
-          </div>
-
-          <h1 className="text-2xl font-black tracking-tight">إدارة مخزون</h1>
-          <p className="mt-1.5 text-xs font-semibold text-blue-100/75">
-            مخزونك جاهز بين إيديك
-          </p>
-
-          <div className="mt-7 flex items-center gap-2" aria-hidden="true">
-            {[0, 1, 2].map(index => (
-              <span
-                key={index}
-                className="h-2 w-2 animate-pulse rounded-full bg-white/50"
-                style={{ animationDelay: `${index * 140}ms` }}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div
-          className="absolute left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5 text-[10px] font-bold text-slate-200/70"
-          style={{ bottom: 'max(26px, calc(env(safe-area-inset-bottom) + 14px))' }}
-          aria-label="من إعداد شركة Dollarix Studio"
-        >
-          <span>من إعداد شركة</span>
-          <img
-            src="/branding/dollarix-studio.png?v=white-logo"
-            alt="Dollarix Studio"
-            className="h-auto w-[138px] object-contain"
-          />
-        </div>
-      </div>
-    );
+  if (!startupReady) {
+    return <StartupScreen message={authLoading ? 'جارٍ التحقق من الحساب…' : 'جارٍ تحضير المخزون…'} slow={startupWaitExpired} />;
   }
 
   if (!user || !currentStaff) {
@@ -2892,6 +2865,7 @@ const App: React.FC = () => {
     <div
       className="
         app-viewport
+        atelier-app
         bg-slate-100/70
         md:bg-[#eef2f6]
         dark:bg-neutral-950
@@ -2903,6 +2877,7 @@ const App: React.FC = () => {
         transition-colors
       "
       dir="rtl"
+      data-view={view}
     >
 
       <Sidebar
@@ -2997,6 +2972,10 @@ const App: React.FC = () => {
         "
       >
         <Header
+          showBrandMark={view === 'dashboard'}
+          categories={view === 'inventory' ? categories : undefined}
+          activeCategoryId={activeCategoryId ?? undefined}
+          onSelectCategory={view === 'inventory' ? handleCategoryChange : undefined}
           onOpenSidebar={() =>
             setIsSidebarOpen(
               true
@@ -3014,7 +2993,7 @@ const App: React.FC = () => {
                 ? activeCategoryData.name
                 : view ===
                     'logs'
-                  ? 'سجل الحركات والأحداث'
+                  ? 'الحركات'
                   : view ===
                       'settings'
                     ? 'الإعدادات'
@@ -3073,13 +3052,14 @@ const App: React.FC = () => {
               py-4
               sm:py-6
               pb-[calc(105px+env(safe-area-inset-bottom))]
-              lg:pb-6
+              lg:pb-[120px]
             "
           >
-            <div className="w-full">
+            <div className="atelier-view w-full" key={view}>
                 {view ===
                 'dashboard' ? (
                   <Dashboard
+                    key={homeVisitKey}
                     allTiles={
                       allItemsCombined
                     }
@@ -3095,17 +3075,10 @@ const App: React.FC = () => {
                     isSyncing={
                       loading
                     }
-                    onSearch={
-                      term => {
-                        setSearchQuery(
-                          term
-                        );
-
-                        changeView(
-                          'inventory'
-                        );
-                      }
-                    }
+                    searchInputRef={homeSearchInputRef}
+                    onSearchActiveChange={setIsHomeSearching}
+                    onEditTile={handleEditClick}
+                    onViewModelLogs={handleViewModelLogs}
                     onSelectCategory={
                       catId => {
                         setIsAddingNew(
@@ -3123,31 +3096,6 @@ const App: React.FC = () => {
                           v as ViewMode
                         )
                     }
-                    onAddTile={() => {
-                      changeView(
-                        'inventory'
-                      );
-
-                      setAddItemSource(
-                        'global'
-                      );
-
-                      setIsAddingNew(
-                        true
-                      );
-                    }}
-                    onOpenCategoryManager={
-                      catId => {
-                        setEditingCategoryModalId(
-                          catId ||
-                            null
-                        );
-
-                        setIsCategoryModalOpen(
-                          true
-                        );
-                      }
-                    }
                     onOpenReservation={
                       tile =>
                         setReservingTile(
@@ -3157,352 +3105,20 @@ const App: React.FC = () => {
                   />
                 ) : view ===
                   'inventory' ? (
-                  <div className="mt-2">
-                    <div
-                      className="
-                        flex
-                        items-center
-                        gap-1.5
-                        overflow-x-auto
-                        max-w-full
-                        pb-1
-                        mb-3
-                        custom-scrollbar
-                        no-print
-                        relative
-                      "
-                    >
-                      <LayoutGroup
-                        id="inventory-categories"
-                      >
-                        {categories.map(
-                          cat => {
-                            const isActive =
-                              activeCategoryId ===
-                              cat.id;
-
-                            return (
-                              <button
-                                key={
-                                  cat.id
-                                }
-                                onClick={() =>
-                                  handleCategoryChange(
-                                    cat.id
-                                  )
-                                }
-                                className={`
-                                  relative
-                                  text-xs
-                                  font-bold
-                                  px-3.5
-                                  py-2
-                                  rounded-xl
-                                  transition-colors
-                                  whitespace-nowrap
-                                  cursor-pointer
-                                  overflow-hidden
-                                  border
-                                  ${
-                                    isActive
-                                      ? 'text-white dark:text-black border-transparent shadow-sm'
-                                      : 'bg-white dark:bg-neutral-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-800'
-                                  }
-                                `}
-                              >
-                                {isActive && (
-                                  <motion.div
-                                    layoutId="active-category-indicator"
-                                    className="
-                                      absolute
-                                      inset-0
-                                      rounded-xl
-                                    "
-                                    style={{
-                                      backgroundColor:
-                                        isDarkMode
-                                          ? (
-                                              CATEGORY_ACCENTS[
-                                                cat.themeColor
-                                              ]?.dark ||
-                                              '#ffffff'
-                                            )
-                                          : (
-                                              CATEGORY_ACCENTS[
-                                                cat.themeColor
-                                              ]?.light ||
-                                              '#0f172a'
-                                            )
-                                    }}
-                                    transition={
-                                      springTransition
-                                    }
-                                  />
-                                )}
-
-                                <span
-                                  className="
-                                    relative
-                                    z-10
-                                  "
-                                >
-                                  {
-                                    cat.name
-                                  }
-                                </span>
-                              </button>
-                            );
-                          }
-                        )}
-                      </LayoutGroup>
-
-                      {!isEmployee && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingCategoryModalId(
-                              null
-                            );
-
-                            setIsCategoryModalOpen(
-                              true
-                            );
-                          }}
-                          className="
-                            text-xs
-                            font-bold
-                            px-3
-                            py-2
-                            rounded-xl
-                            bg-slate-100
-                            dark:bg-neutral-900
-                            text-slate-600
-                            dark:text-slate-300
-                            border
-                            border-slate-200
-                            dark:border-neutral-800
-                            hover:bg-slate-200
-                            dark:hover:bg-neutral-800
-                            cursor-pointer
-                            whitespace-nowrap
-                          "
-                          title="تخصيص وإضافة أقسام"
-                        >
-                          + قسم
-                        </button>
-                      )}
-                    </div>
-
-                    <div
-                      className="
-                        no-print
-                        mb-3
-                        flex
-                        items-center
-                        justify-between
-                        gap-2
-                        rounded-[16px]
-                        border
-                        border-slate-200/70
-                        bg-white
-                        px-2.5
-                        py-2
-                        shadow-sm
-                        dark:border-white/[0.07]
-                        dark:bg-neutral-900
-                        sm:px-3
-                      "
-                    >
-                      <div
-                        className="
-                          flex
-                          min-w-0
-                          items-center
-                          gap-2
-                        "
-                      >
-                        <div
-                          className="
-                            flex
-                            min-w-0
-                            items-center
-                            gap-1.5
-                          "
-                        >
-                          <h2
-                            className="
-                              whitespace-nowrap
-                              text-sm
-                              font-bold
-                              text-slate-800
-                              dark:text-slate-200
-                            "
-                          >
-                            الأصناف
-                          </h2>
-
-                          <span
-                            className="
-                              rounded-full
-                              bg-slate-100
-                              px-1.5
-                              py-0.5
-                              text-[9px]
-                              font-bold
-                              text-slate-500
-                              dark:bg-neutral-800
-                              dark:text-slate-400
-                            "
-                          >
-                            {
-                              currentTiles.length
-                            }
-                          </span>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setIsFullListModalOpen(
-                              true
-                            )
-                          }
-                          className="
-                            shrink-0
-                            whitespace-nowrap
-                            text-[10px]
-                            font-bold
-                            text-indigo-600
-                            transition-colors
-                            hover:text-indigo-700
-                            dark:text-indigo-400
-                            dark:hover:text-indigo-300
-                          "
-                        >
-                          عرض الكل
-                        </button>
-                      </div>
-
-                      <div
-                        className="
-                          flex
-                          shrink-0
-                          items-center
-                          gap-1.5
-                        "
-                      >
-                        <button
-                          type="button"
-                          onClick={openPrintReport}
-                          className="
-                            flex
-                            h-9
-                            w-9
-                            items-center
-                            justify-center
-                            rounded-[11px]
-                            border
-                            border-slate-200/70
-                            bg-slate-50
-                            text-slate-500
-                            transition-colors
-                            hover:bg-slate-100
-                            active:scale-[0.98]
-                            dark:border-white/[0.07]
-                            dark:bg-neutral-800
-                            dark:text-slate-300
-                            dark:hover:bg-neutral-700
-                          "
-                          title="طباعة وتصدير كشف المخزون"
-                          aria-label="طباعة وتصدير كشف المخزون"
-                        >
-                          <PrintIcon
-                            className="
-                              h-4
-                              w-4
-                            "
-                          />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAddItemSource(
-                              'category'
-                            );
-
-                            setIsAddingNew(
-                              true
-                            );
-                          }}
-                          className="
-                            flex
-                            h-9
-                            items-center
-                            justify-center
-                            gap-1.5
-                            whitespace-nowrap
-                            rounded-[11px]
-                            bg-slate-900
-                            px-3
-                            text-[11px]
-                            font-bold
-                            text-white
-                            shadow-sm
-                            transition
-                            active:scale-[0.98]
-                            dark:bg-white
-                            dark:text-slate-900
-                            sm:px-4
-                            sm:text-xs
-                          "
-                        >
-                          <PlusIcon
-                            className="
-                              h-4
-                              w-4
-                              shrink-0
-                            "
-                          />
-
-                          <span>
-                            إضافة صنف
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-
-
-
-                    <div
-                      className="
-                        flex
-                        items-center
-                        gap-2
-                        my-2.5
-                        no-print
-                      "
-                    >
-                      <div
-                        className="
-                          flex-1
-                          w-full
-                          min-w-0
-                        "
-                      >
-                        <SearchFilter
-                          searchQuery={
-                            searchQuery
-                          }
-                          onSearchChange={
-                            setSearchQuery
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                        <div id="print-area">
+                  <InventoryWorkspace
+                    categories={categories}
+                    category={activeCategoryData}
+                    tiles={currentTiles}
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    onSelectCategory={handleCategoryChange}
+                    onShowAll={() => setIsFullListModalOpen(true)}
+                    onPrint={openPrintReport}
+                    onAdd={() => { setAddItemSource('category'); setIsAddingNew(true); }}
+                    onManageCategories={isEmployee ? undefined : () => {
+                      setEditingCategoryModalId(null); setIsCategoryModalOpen(true);
+                    }}
+                  >
                           <TileList
                             tiles={
                               filteredTiles
@@ -3543,26 +3159,14 @@ const App: React.FC = () => {
                               currentStaff
                             }
                           />
-                        </div>
-
-                        <SummaryCards
-                          tiles={
-                            currentTiles
-                          }
-                          activeCategoryId={
-                            activeCategoryId ||
-                            undefined
-                          }
-                          themeColor={
-                            activeCategoryData
-                              .themeColor
-                          }
-                        />
-                    </div>
-                  </div>
+                  </InventoryWorkspace>
                 ) : view ===
                   'logs' ? (
                   <LogsView
+                    tiles={allItemsCombined}
+                    onEditTile={handleEditClick}
+                    onOpenReservation={setReservingTile}
+                    onViewModelLogs={handleViewModelLogs}
                     logs={
                       visibleLogs
                     }
@@ -3752,6 +3356,14 @@ const App: React.FC = () => {
       )}
 
       <BottomNav
+        isSearching={isHomeSearching}
+        onSearch={() => {
+          // Focus within the tap event so iOS opens the keyboard as well.
+          flushSync(() => changeView('dashboard'));
+          homeSearchInputRef.current?.focus({ preventScroll: true });
+          homeSearchInputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }}
+        onMenu={() => setIsSidebarOpen(true)}
         view={
           view
         }
@@ -3759,6 +3371,7 @@ const App: React.FC = () => {
           isAddingNew
         }
         onHome={() => {
+          setHomeVisitKey(value => value + 1);
           setIsAddingNew(
             false
           );

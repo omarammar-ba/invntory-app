@@ -30,12 +30,14 @@ import {
   Image as ImageIcon,
   Calculator,
   Info,
+  ChevronDown,
 } from 'lucide-react';
 
 import {
   ResponsiveOverlay,
 } from '@/components/ui/ResponsiveOverlay';
 import { ActionFeedback } from '@/components/ui/ActionFeedback';
+import { CategorySymbol } from '@/components/ui/CategorySymbol';
 
 import {
   AppChoiceField,
@@ -2149,154 +2151,101 @@ const TileForm:
             ? 'تعديل الصنف'
             : 'إضافة صنف'
         }
-        mobileSnap="compact"
+        mobileSnap="expanded"
         desktopMaxWidth="max-w-2xl"
-        contentClassName="app-readable p-0"
-      >
-        <div
+        contentClassName="inventory-editor app-readable p-0"
+        footer={<div
           className="
-            border-b
-            border-slate-100
-            bg-white
-            px-4
-            py-3
-            dark:border-white/[0.05]
-            dark:bg-neutral-900
-            sm:px-6
+            editor-footer
+            flex
+            shrink-0
+            items-center
+            gap-2.5
+            border-t
+            border-slate-200/80
+            bg-slate-50/95
+            p-3.5
+            backdrop-blur-md
+            dark:border-white/[0.08]
+            dark:bg-neutral-900/95
+            sm:p-4
           "
         >
-          <div
+          <button
+            type="button"
+            onClick={
+              onCancel
+            }
+            disabled={isSaving}
             className="
-              flex
-              items-center
-              justify-between
-              gap-3
+              flex-1
+              cursor-pointer
+              rounded-2xl
+              px-4
+              py-3
+              text-center
+              text-xs
+              font-bold
+              text-slate-600
+              transition-colors
+              hover:bg-slate-200
+              dark:text-slate-300
+              dark:hover:bg-neutral-800
+              sm:flex-none
             "
           >
-            <div className="min-w-0">
-              <span
-                className="
-                  inline-flex
-                  rounded-full
-                  border
-                  border-indigo-100
-                  bg-indigo-50
-                  px-2.5
-                  py-1
-                  text-[10px]
-                  font-bold
-                  text-indigo-700
-                  dark:border-indigo-800/40
-                  dark:bg-indigo-950/40
-                  dark:text-indigo-300
-                "
-              >
-                {
-                  effectiveCategory.name
-                }
-              </span>
-            </div>
+            إلغاء
+          </button>
 
-            {onCustomizeCategory && (
-                <button
-                  type="button"
-                  onClick={() => onCustomizeCategory(selectedCatId)}
-                  className="
-                    flex h-9 items-center gap-1.5 rounded-full
-                    border border-slate-200/70 bg-slate-50 px-3
-                    text-[10px] font-bold text-slate-600 shadow-sm
-                    transition active:scale-[0.98]
-                    hover:bg-slate-100 dark:border-white/[0.07]
-                    dark:bg-neutral-800 dark:text-slate-300
-                    dark:hover:bg-neutral-700
-                  "
-                >
-                  <SettingsIcon className="h-3.5 w-3.5" />
-                  تخصيص القسم
-                </button>
-              )}
+          <button
+            type="submit"
+            form="tile-form"
+            disabled={isSaving || isCompressing}
+            className="
+              flex
+              flex-[2]
+              cursor-pointer
+              items-center
+              justify-center
+              gap-2
+              rounded-2xl
+              bg-emerald-600
+              px-5
+              py-3
+              text-xs
+              font-black
+              text-white
+              shadow-md
+              transition-all
+              hover:bg-emerald-700
+              active:scale-[0.98]
+              disabled:cursor-not-allowed
+              disabled:opacity-60
+              sm:flex-1
+            "
+          >
+            <SaveIcon />
+
+            <span>
+              {isSaving
+                ? 'جاري الحفظ...'
+                : editingTile
+                  ? 'حفظ التعديلات'
+                  : 'إضافة الصنف'}
+            </span>
+          </button>
+        </div>}
+      >
+        <div className="editor-intro">
+          <div className="editor-department"><CategorySymbol category={effectiveCategory} size={28} />
+            {allowCategorySwitch && !editingTile ? <label><span className="sr-only">قسم الصنف</span>
+              <select value={selectedCatId} onChange={event => handleCategorySwitch(event.target.value)}>
+                {allAvailableCats.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+              </select><ChevronDown size={15} aria-hidden="true" />
+            </label> : <span>{effectiveCategory.name}</span>}
           </div>
-
-          {allowCategorySwitch &&
-            !editingTile && (
-              <div
-                className="
-                  mt-3
-                  flex
-                  items-center
-                  gap-2
-                  overflow-x-auto
-                  pb-1
-                "
-              >
-                <span
-                  className="
-                    shrink-0
-                    text-[10px]
-                    font-bold
-                    text-slate-500
-                    dark:text-slate-400
-                  "
-                >
-                  اختر القسم
-                </span>
-
-                {allAvailableCats.map(
-                  cat => {
-                    const selected =
-                      cat.id ===
-                      selectedCatId;
-
-                    return (
-                      <button
-                        key={
-                          cat.id
-                        }
-                        type="button"
-                        onClick={() =>
-                          handleCategorySwitch(
-                            cat.id,
-                          )
-                        }
-                        className={`
-                          h-9
-                          shrink-0
-                          rounded-full
-                          px-3
-                          text-xs
-                          font-bold
-                          transition-colors
-                          ${
-                            selected
-                              ? `
-                                bg-slate-900
-                                text-white
-                                dark:bg-white
-                                dark:text-slate-900
-                              `
-                              : `
-                                border
-                                border-slate-200
-                                bg-white
-                                text-slate-600
-                                dark:border-white/[0.07]
-                                dark:bg-neutral-800
-                                dark:text-slate-300
-                              `
-                          }
-                        `}
-                      >
-                        {
-                          cat.name
-                        }
-                      </button>
-                    );
-                  },
-                )}
-              </div>
-            )}
+          {onCustomizeCategory && <button type="button" onClick={() => onCustomizeCategory(selectedCatId)}><SettingsIcon className="h-4 w-4" />تخصيص الحقول</button>}
         </div>
-
         <form
           id="tile-form"
           noValidate
@@ -2305,14 +2254,10 @@ const TileForm:
           }
           onChange={() => setFormError(null)}
           className="
-            space-y-4
-            p-4
-            sm:p-6
+            editor-fields
           "
         >
-          <p className="text-sm font-medium leading-6 text-slate-600 dark:text-slate-300">
-            أدخل اسم الصنف والكمية أولاً. الحقول المعلّمة بنجمة مطلوبة، والصورة اختيارية.
-          </p>
+          <p className="editor-required-note">الحقول المعلّمة بنجمة مطلوبة.</p>
 
           {formError && (
             <div ref={feedbackRef} tabIndex={-1} className="outline-none">
@@ -2322,18 +2267,7 @@ const TileForm:
 
           {isSystem ? (
             <>
-              <div
-                className="
-                  space-y-3.5
-                  rounded-2xl
-                  border
-                  border-slate-200/80
-                  bg-slate-50/80
-                  p-4
-                  dark:border-white/[0.06]
-                  dark:bg-neutral-800/40
-                "
-              >
+              <div id="tile-editor-details" className="editor-section" data-editor-section="details">
                 <div
                   className="
                     flex
@@ -2362,7 +2296,7 @@ const TileForm:
                       dark:text-slate-200
                     "
                   >
-                    البيانات والمواصفات الأساسية
+                    مواصفات الصنف
                   </h3>
                 </div>
 
@@ -2847,18 +2781,7 @@ const TileForm:
                 )}
               </div>
 
-              <div
-                className="
-                  space-y-3
-                  rounded-2xl
-                  border
-                  border-slate-200/80
-                  bg-slate-50/80
-                  p-4
-                  dark:border-white/[0.06]
-                  dark:bg-neutral-800/40
-                "
-              >
+              <div id="tile-editor-quantity" className="editor-section" data-editor-section="quantity">
                 <div
                   className="
                     flex
@@ -2894,7 +2817,7 @@ const TileForm:
                         dark:text-slate-200
                       "
                     >
-                      الكميات والحسابات الفورية
+                      كمية المخزون
                     </h3>
                   </div>
                 </div>
@@ -3065,18 +2988,7 @@ const TileForm:
             </>
           ) : (
             <>
-              <div
-                className="
-                  space-y-3.5
-                  rounded-2xl
-                  border
-                  border-slate-200/80
-                  bg-slate-50/80
-                  p-4
-                  dark:border-white/[0.06]
-                  dark:bg-neutral-800/40
-                "
-              >
+              <div id="tile-editor-details" className="editor-section" data-editor-section="details">
                 <div
                   className="
                     flex
@@ -3423,18 +3335,7 @@ const TileForm:
                 )}
               </div>
 
-              <div
-                className="
-                  space-y-3
-                  rounded-2xl
-                  border
-                  border-slate-200/80
-                  bg-slate-50/80
-                  p-4
-                  dark:border-white/[0.06]
-                  dark:bg-neutral-800/40
-                "
-              >
+              <div id="tile-editor-quantity" className="editor-section" data-editor-section="quantity">
                 <div
                   className="
                     flex
@@ -3539,18 +3440,7 @@ const TileForm:
             </>
           )}
 
-          <div
-            className="
-              space-y-3.5
-              rounded-2xl
-              border
-              border-slate-200/80
-              bg-slate-50/80
-              p-4
-              dark:border-white/[0.06]
-              dark:bg-neutral-800/40
-            "
-          >
+          {(showImageField || canManageVisibility || Boolean(formState.image)) && <section id="tile-editor-media" className="editor-section" data-editor-section="media">
             <div
               className="
                 flex
@@ -3848,89 +3738,10 @@ const TileForm:
               </label>
             </div>
             )}
-          </div>
+          </section>}
         </form>
 
-        <div
-          className="
-            flex
-            shrink-0
-            items-center
-            gap-2.5
-            border-t
-            border-slate-200/80
-            bg-slate-50/95
-            p-3.5
-            backdrop-blur-md
-            dark:border-white/[0.08]
-            dark:bg-neutral-900/95
-            sm:p-4
-          "
-        >
-          <button
-            type="button"
-            onClick={
-              onCancel
-            }
-            disabled={isSaving}
-            className="
-              flex-1
-              cursor-pointer
-              rounded-2xl
-              px-4
-              py-3
-              text-center
-              text-xs
-              font-bold
-              text-slate-600
-              transition-colors
-              hover:bg-slate-200
-              dark:text-slate-300
-              dark:hover:bg-neutral-800
-              sm:flex-none
-            "
-          >
-            إلغاء
-          </button>
-
-          <button
-            type="submit"
-            form="tile-form"
-            disabled={isSaving || isCompressing}
-            className="
-              flex
-              flex-[2]
-              cursor-pointer
-              items-center
-              justify-center
-              gap-2
-              rounded-2xl
-              bg-emerald-600
-              px-5
-              py-3
-              text-xs
-              font-black
-              text-white
-              shadow-md
-              transition-all
-              hover:bg-emerald-700
-              active:scale-[0.98]
-              disabled:cursor-not-allowed
-              disabled:opacity-60
-              sm:flex-1
-            "
-          >
-            <SaveIcon />
-
-            <span>
-              {isSaving
-                ? 'جاري الحفظ...'
-                : editingTile
-                  ? 'حفظ وتحديث الصنف'
-                  : 'حفظ وإضافة الصنف الجديد'}
-            </span>
-          </button>
-        </div>
+        
       </ResponsiveOverlay>
     );
   };

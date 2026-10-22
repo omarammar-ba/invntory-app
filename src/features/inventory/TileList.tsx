@@ -58,10 +58,13 @@ const InventoryLoadingGlyphs: React.FC<{
   label?: string;
   compact?: boolean;
 }> = ({ label, compact = false }) => {
-  const boxClass = compact
-    ? 'h-6 w-6 rounded-lg'
-    : 'h-10 w-10 rounded-xl';
-  const iconClass = compact ? 'h-3 w-3' : 'h-4 w-4';
+  if (compact) return (
+    <span className="inventory-sync-label">
+      <span aria-hidden="true" />{label}
+    </span>
+  );
+  const boxClass = 'h-10 w-10 rounded-xl';
+  const iconClass = 'h-4 w-4';
 
   const glyphs = [
     { Icon: FolderIcon, delay: '0ms' },
@@ -70,7 +73,7 @@ const InventoryLoadingGlyphs: React.FC<{
   ];
 
   return (
-    <div className={compact ? 'flex items-center justify-center gap-2' : 'flex flex-col items-center justify-center gap-3'}>
+    <div className="flex flex-col items-center justify-center gap-3">
       <div className="flex items-center justify-center gap-1.5" aria-hidden="true">
         {glyphs.map(({ Icon, delay }, index) => (
           <span
@@ -84,7 +87,7 @@ const InventoryLoadingGlyphs: React.FC<{
       </div>
 
       {label && (
-        <span className={compact ? 'text-[10px] font-semibold text-slate-400 dark:text-slate-500' : 'text-[11px] font-semibold text-slate-400 dark:text-slate-500'}>
+        <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
           {label}
         </span>
       )}
@@ -208,6 +211,7 @@ const TileList: React.FC<
   return (
     <div
       className="
+        atelier-inventory-list
         mt-3
         print:mt-0
         print:w-full
@@ -286,11 +290,9 @@ const TileList: React.FC<
               </StaggerItem>
             ))}
 
-            {loading && (
-              <div className="border-t border-slate-100 px-3 py-2.5 dark:border-white/[0.05]">
-                <InventoryLoadingGlyphs compact label="جاري تحديث بقية الأصناف..." />
-              </div>
-            )}
+            <div className="inventory-sync-slot print:hidden" role="status" aria-live="polite">
+              {loading && <InventoryLoadingGlyphs compact label="جارٍ تحديث بقية الأصناف…" />}
+            </div>
           </>
         )}
       </div>
@@ -890,13 +892,13 @@ const TileList: React.FC<
                   },
                 )}
 
-                {loading && (
-                  <tr>
-                    <td colSpan={5} className="py-3 text-center">
-                      <InventoryLoadingGlyphs compact label="جاري تحديث بقية الأصناف..." />
-                    </td>
-                  </tr>
-                )}
+                <tr className="print:hidden">
+                  <td colSpan={5} className="p-0 text-center">
+                    <div className="inventory-sync-slot" role="status" aria-live="polite">
+                      {loading && <InventoryLoadingGlyphs compact label="جارٍ تحديث بقية الأصناف…" />}
+                    </div>
+                  </td>
+                </tr>
                 </>
               )}
             </tbody>

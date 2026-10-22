@@ -1679,7 +1679,7 @@ const CategoryManagerModal:
         }
         mobileSnap="large"
         desktopMaxWidth="max-w-3xl"
-        contentClassName="app-readable p-4 sm:p-6"
+        contentClassName="workspace-admin app-readable p-4 sm:p-6"
       >
         {!isEditing && (
           <div>
@@ -1759,7 +1759,7 @@ const CategoryManagerModal:
                   active:scale-[0.98]
                   dark:bg-white
                   dark:text-slate-900
-                "
+                " data-ui="primary"
               >
                 <Plus
                   className="
@@ -2573,7 +2573,7 @@ const CategoryManagerModal:
                         active:scale-95
                         dark:bg-white
                         dark:text-slate-900
-                      "
+                      " data-ui="primary"
                     >
                       <Plus
                         className="
@@ -3135,7 +3135,7 @@ const CategoryManagerModal:
                                   text-white
                                   dark:bg-white
                                   dark:text-slate-900
-                                "
+                                " data-ui="primary"
                               >
                                 إضافة
                               </button>
@@ -3348,7 +3348,7 @@ const CategoryManagerModal:
                           text-white
                           dark:bg-white
                           dark:text-slate-900
-                        "
+                        " data-ui="primary"
                       >
                         <Check
                           className="
@@ -3851,7 +3851,7 @@ const CategoryManagerModal:
                     disabled:opacity-60
                     dark:bg-white
                     dark:text-slate-900
-                  "
+                  " data-ui="primary"
                 >
                   {editingCatId ? (
                     <EditIcon />

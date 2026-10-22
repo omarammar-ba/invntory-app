@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "tsc --noEmit",
     "preview": "vite preview --host 0.0.0.0 --port 3000",
-    "test:rules": "npx firebase-tools emulators:exec --only firestore \"node tests/firestore.rules.test.js\""
+    "test:rules": "npx firebase-tools emulators:exec --only firestore \"node tests/firestore.rules.test.js\"",
+    "test:dashboard": "node --test tests/dashboard-model.test.mjs"
   },
   "dependencies": {
     "firebase": "^10.8.0",

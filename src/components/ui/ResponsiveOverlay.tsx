@@ -15,6 +15,7 @@ export interface ResponsiveOverlayProps {
   desktopMaxWidth?: string;
   contentClassName?: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
 }
 
 export const ResponsiveOverlay: React.FC<
@@ -28,6 +29,7 @@ export const ResponsiveOverlay: React.FC<
   desktopMaxWidth = 'max-w-2xl',
   contentClassName,
   children,
+  footer,
 }) => {
   const isMobile = useIsMobile();
 
@@ -39,6 +41,7 @@ export const ResponsiveOverlay: React.FC<
         onExited={onExited}
         title={title}
         initialSnap={mobileSnap}
+        footer={footer}
         contentClassName={contentClassName}
       >
         {children}
@@ -53,6 +56,7 @@ export const ResponsiveOverlay: React.FC<
       onExited={onExited}
       title={title}
       maxWidth={desktopMaxWidth}
+      footer={footer}
       contentClassName={contentClassName}
     >
       {children}

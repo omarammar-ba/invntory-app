@@ -14,6 +14,7 @@ export interface DesktopDialogProps {
   title?: string;
   maxWidth?: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   contentClassName?: string;
 }
 
@@ -24,6 +25,7 @@ export const DesktopDialog: React.FC<DesktopDialogProps> = ({
   title,
   maxWidth = 'max-w-2xl',
   children,
+  footer,
   contentClassName = 'p-6',
 }) => {
   const prefersReducedMotion = useReducedMotion();
@@ -148,7 +150,7 @@ export const DesktopDialog: React.FC<DesktopDialogProps> = ({
                   : 0.2,
               ease: [0.22, 1, 0.36, 1],
             }}
-            className={`
+            className={`workspace-overlay 
               relative
               z-[301]
               flex
@@ -228,6 +230,7 @@ export const DesktopDialog: React.FC<DesktopDialogProps> = ({
             >
               {children}
             </div>
+            {footer && <div className="shrink-0">{footer}</div>}
           </motion.section>
         </motion.div>
       )}

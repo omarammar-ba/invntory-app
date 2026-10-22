@@ -1,3 +1,8 @@
+@import "./styles/fonts.css";
+@import "./styles/atelier.css";
+@import "./styles/workspace.css";
+@import "./styles/refinement.css";
+@import "./styles/polish.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

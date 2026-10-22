@@ -1,1172 +1,204 @@
-import React, { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import React, { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
-  Bath,
-  Box,
-  ChevronLeft,
-  FolderCog,
-  Grid3X3,
-  LayoutGrid,
-  PackageOpen,
-  PanelsTopLeft,
-  Pencil,
-  Ruler,
-  Search,
-  ShowerHead,
-  Tags,
-  UserCheck,
-  Plus,
-  Armchair,
-  Layers3,
-} from '@/components/ui/AppIcons';
-import { Category, LogEntry, StaffMember, Tile } from '@/types';
-import { CATEGORY_THEME_STYLES } from '@/styles/uiTokens';
+  Bookmark, ChevronDown, ChevronLeft,
+  History, PackageOpen, Pencil, Search, SlidersHorizontal, X,
+} from 'lucide-react';
+import type { Category, LogEntry, StaffMember, Tile } from '@/types';
 import { motionEase } from '@/styles/motion';
+import HomeSearchFilters from './HomeSearchFilters';
+import SearchCoachmark from './SearchCoachmark';
+import ActivityTimeline from '@/components/ui/ActivityTimeline';
+import { CategorySymbol } from '@/components/ui/CategorySymbol';
+import ItemDetailsSheet, { type ItemSelection } from '@/components/ui/ItemDetailsSheet';
+import {
+  activeFilterCount, EMPTY_HOME_FILTERS, getLogDate,
+  createHomeSearchIndex, searchHomeIndex, orderHomeCategories, type HomeSearchFilters as Filters,
+} from './dashboardModel';
 
 interface DashboardProps {
   allTiles?: Tile[];
-  allReservations?: any[];
   logs?: LogEntry[];
   categories?: Category[];
   currentStaff?: StaffMember | null;
   isSyncing?: boolean;
-  onSearch?: (term: string) => void;
+  searchInputRef?: React.RefObject<HTMLInputElement>;
   onSelectCategory: (categoryId: string) => void;
   onNavigate: (tab: string) => void;
-  onAddTile?: () => void;
-  onOpenCategoryManager?: (categoryId?: string | null) => void;
   onOpenReservation?: (tile: Tile) => void;
+  onEditTile?: (tile: Tile) => void;
+  onViewModelLogs?: (name: string) => void;
+  onSearchActiveChange?: (active: boolean) => void;
 }
 
-const CUSTOM_CATEGORY_ICONS = [
-  PackageOpen,
-  Box,
-  Layers3,
-  Tags,
-  Ruler,
-  Armchair,
-  Bath,
-  FolderCog,
-];
+const number = (value: number, digits = 2) => value.toLocaleString('en-US', { maximumFractionDigits: digits });
+const quantity = (tile: Tile) => Number.isFinite(Number(tile.meters)) ? Number(tile.meters) : 0;
 
-function hashString(value: string) {
-  let hash = 0;
+export default function Dashboard({
+  allTiles = [], logs = [], categories = [], currentStaff, isSyncing = false,
+  searchInputRef, onSelectCategory, onNavigate, onOpenReservation,
+  onEditTile, onViewModelLogs, onSearchActiveChange,
+}: DashboardProps) {
+  const [search, setSearch] = useState('');
+  const [inspecting, setInspecting] = useState<ItemSelection | null>(null);
+  const inspectorTrigger = useRef<HTMLElement | null>(null);
+  const inspectorScroll = useRef(0);
+  const inspect = (name: string, categoryId?: string) => { inspectorTrigger.current = document.activeElement as HTMLElement; inspectorScroll.current = window.scrollY; setInspecting({ name, categoryId }); };
+  const restoreInspectorFocus = () => window.requestAnimationFrame(() => { inspectorTrigger.current?.focus({ preventScroll: true }); window.scrollTo({ top: inspectorScroll.current, behavior: 'instant' }); });
+  const [filters, setFilters] = useState<Filters>({ ...EMPTY_HOME_FILTERS });
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [expandedItem, setExpandedItem] = useState<string | null>(null);
+  const [visibleResultCount, setVisibleResultCount] = useState(12);
+  const localSearchRef = useRef<HTMLInputElement>(null);
+  const searchRef = searchInputRef || localSearchRef;
+  const filterRef = useRef<HTMLButtonElement>(null);
+  const resultsRef = useRef<HTMLElement>(null);
+  const resultId = useId();
+  const reduceMotion = useReducedMotion();
+  const deferredSearch = useDeferredValue(search);
+  const items = Array.isArray(allTiles) ? allTiles : [];
+  const safeCategories = useMemo(() => orderHomeCategories(Array.isArray(categories) ? categories : []), [categories]);
+  const filterCount = activeFilterCount(filters);
+  const searching = Boolean(search.trim() || filterCount);
 
-  for (let index = 0; index < value.length; index += 1) {
-    hash =
-      value.charCodeAt(index) +
-      ((hash << 5) - hash);
 
-    hash |= 0;
-  }
 
-  return Math.abs(hash);
-}
+  useEffect(() => {
+    onSearchActiveChange?.(searching);
+    return () => onSearchActiveChange?.(false);
+  }, [searching, onSearchActiveChange]);
 
-function getCategoryVisual(
-  category: Category,
-  index: number,
-) {
-  let icon =
-    CUSTOM_CATEGORY_ICONS[
-      hashString(
-        category.id || `${index}`,
-      ) %
-        CUSTOM_CATEGORY_ICONS.length
-    ];
+  useEffect(() => { setVisibleResultCount(12); setExpandedItem(null); }, [deferredSearch, filters]);
 
-  let subtitle =
-    category.defaultUnit === 'pieces'
-      ? 'أصناف بالقطعة'
-      : 'أرضيات وحوائط';
-
-  if (category.id === 'tiles') {
-    icon = Grid3X3;
-    subtitle = 'أرضيات وحوائط';
-  } else if (
-    category.id === 'ceramics'
-  ) {
-    icon = LayoutGrid;
-    subtitle = 'أرضيات وحوائط';
-  } else if (
-    category.id === 'shower_box'
-  ) {
-    icon = PanelsTopLeft;
-    subtitle = 'قواطع وحمامات';
-  } else if (
-    category.id === 'mixers'
-  ) {
-    icon = ShowerHead;
-    subtitle = 'خلاطات وشاورات';
-  } else if (
-    category.id === 'sanitary'
-  ) {
-    icon = Bath;
-    subtitle = 'أدوات وتجهيزات';
-  }
-
-  return {
-    icon,
-    subtitle,
-    color:
-      (category.themeColor &&
-        CATEGORY_THEME_STYLES[
-          category.themeColor
-        ]) ||
-      CATEGORY_THEME_STYLES.sky,
-  };
-}
-
-const containerVariants = {
-  hidden: {
-    opacity: 0,
-  },
-
-  show: {
-    opacity: 1,
-
-    transition: {
-      staggerChildren: 0.035,
-      delayChildren: 0.02,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: {
-    opacity: 0,
-    y: 8,
-    scale: 0.995,
-  },
-
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-
-    transition: {
-      duration: 0.22,
-      ease: motionEase,
-    },
-  },
-};
-
-const Dashboard: React.FC<
-  DashboardProps
-> = ({
-  allTiles = [],
-  allReservations,
-  logs = [],
-  categories = [],
-  currentStaff,
-  isSyncing = false,
-  onSearch,
-  onSelectCategory,
-  onNavigate,
-}) => {
-  const [
-    localSearch,
-    setLocalSearch,
-  ] = useState('');
-
-  const safeTiles =
-    Array.isArray(allTiles)
-      ? allTiles
-      : [];
-
-  const safeCategories =
-    Array.isArray(categories)
-      ? categories
-      : [];
-
-  const safeLogs =
-    Array.isArray(logs)
-      ? logs
-      : [];
-
-  const dashboardCategories =
-    useMemo(() => {
-      // Keep the employee experience exactly as configured by Firestore.
-      // For admins only, pin the two core inventory sections to the top
-      // so Porcelain is always first and Ceramics is always second.
-      if (currentStaff?.role !== 'admin') {
-        return safeCategories;
-      }
-
-      const priority: Record<string, number> = {
-        tiles: 0,
-        ceramics: 1,
-      };
-
-      return safeCategories
-        .map((category, originalIndex) => ({ category, originalIndex }))
-        .sort((left, right) => {
-          const leftPriority = priority[left.category.id] ?? 2;
-          const rightPriority = priority[right.category.id] ?? 2;
-
-          if (leftPriority !== rightPriority) {
-            return leftPriority - rightPriority;
-          }
-
-          return left.originalIndex - right.originalIndex;
-        })
-        .map(entry => entry.category);
-    }, [safeCategories, currentStaff?.role]);
-
-  const displayName =
-    currentStaff?.name ||
-    'المستخدم';
-
-  const inventorySummary = useMemo(() => {
-    const byCategory = new Map<string, { count: number; quantity: number }>();
-    let totalQuantity = 0;
-    let reservationCount = 0;
-    let lowStockCount = 0;
-
-    for (const item of safeTiles) {
-      const quantity = Number(item.meters) || 0;
-      totalQuantity += quantity;
-      reservationCount += item.reservations?.length || 0;
-
-      const alertLimit = (item as any).lowStockAlert !== undefined
-        ? Number((item as any).lowStockAlert)
-        : 10;
-      if (quantity > 0 && quantity <= alertLimit) lowStockCount += 1;
-
-      const categoryId = item.categoryId;
-      const categorySummary = byCategory.get(categoryId) || { count: 0, quantity: 0 };
-      categorySummary.count += 1;
-      categorySummary.quantity += quantity;
-      byCategory.set(categoryId, categorySummary);
+  const stats = useMemo(() => {
+    const byCategory = new Map<string, { count: number; meters: number; pieces: number }>();
+    const categoryMap = new Map(safeCategories.map(category => [category.id, category]));
+    let meters = 0, pieces = 0, reservations = 0, lowStock = 0;
+    for (const item of items) {
+      const value = quantity(item);
+      const isPieces = (item.unitType || categoryMap.get(item.categoryId)?.defaultUnit) === 'pieces';
+      if (isPieces) pieces += value; else meters += value;
+      reservations += item.reservations?.length || 0;
+      const threshold = Number((item as Tile & { lowStockAlert?: number }).lowStockAlert ?? 10);
+      if (value > 0 && value <= threshold) lowStock++;
+      const summary = byCategory.get(item.categoryId) || { count: 0, meters: 0, pieces: 0 };
+      summary.count++;
+      if (isPieces) summary.pieces += value; else summary.meters += value;
+      byCategory.set(item.categoryId, summary);
     }
+    return { byCategory, meters, pieces, reservations, lowStock };
+  }, [allTiles, categories]);
 
-    return { byCategory, totalQuantity, reservationCount, lowStockCount };
-  }, [safeTiles]);
+  const searchIndex = useMemo(() => createHomeSearchIndex(items), [allTiles]);
+  const matches = useMemo(() => searching ? searchHomeIndex(searchIndex, deferredSearch, filters) : [],
+    [searchIndex, deferredSearch, filters, searching]);
 
-  const totalItemsCount = safeTiles.length;
-  const totalQuantitySum = inventorySummary.totalQuantity;
-  const activeReservationsCount = Array.isArray(allReservations)
-    ? allReservations.length
-    : inventorySummary.reservationCount;
-  const lowStockCount = inventorySummary.lowStockCount;
+  const recentLogs = useMemo(() => (Array.isArray(logs) ? logs : []).map((log, index) => ({ log, index }))
+    .sort((a, b) => (getLogDate(b.log.timestamp)?.getTime() || 0) - (getLogDate(a.log.timestamp)?.getTime() || 0) || a.index - b.index)
+    .slice(0, 4).map(entry => entry.log), [logs]);
 
-  const handleSearchSubmit = (
-    event: React.FormEvent,
-  ) => {
-    event.preventDefault();
-
-    const term =
-      localSearch.trim();
-
-    if (
-      term &&
-      onSearch
-    ) {
-      onSearch(term);
-    }
+  const enter = (delay: number) => reduceMotion ? {} : {
+    initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.38, delay, ease: motionEase },
   };
+  const clearSearch = () => { setSearch(''); setFilters({ ...EMPTY_HOME_FILTERS }); searchRef.current?.focus(); };
 
-  return (
-    <motion.div
-      initial="hidden"
-      animate="show"
-      variants={
-        containerVariants
-      }
-      className="space-y-4 pb-4"
-      dir="rtl"
-    >
-      <motion.div
-        variants={itemVariants}
-        className="pt-0.5"
-      >
-        <h1
-          className="
-            flex
-            items-center
-            gap-2
-            text-xl
-            font-black
-            tracking-tight
-            text-slate-900
-            dark:text-white
-            sm:text-2xl
-          "
-        >
-          <span>
-            مرحباً{' '}
-            {displayName}
-          </span>
-
-          <span
-            className="select-none"
-            role="img"
-            aria-label="تحية"
-          >
-            👋
-          </span>
-        </h1>
-
-        <p
-          className="
-            mt-0.5
-            text-[11px]
-            font-medium
-            text-slate-500
-            dark:text-slate-400
-            sm:text-xs
-          "
-        >
-          راجع المخزون والأقسام
-          والحركات من مكان واحد.
-        </p>
-      </motion.div>
-
-      <motion.form
-        variants={itemVariants}
-        onSubmit={
-          handleSearchSubmit
-        }
-        className="relative"
-      >
-        <div
-          className="
-            relative
-            flex
-            items-center
-          "
-        >
-          <input
-            type="text"
-            value={localSearch}
-            onChange={event =>
-              setLocalSearch(
-                event.target.value,
-              )
-            }
-            placeholder="ابحث عن صنف، موديل، قياس، كود، لون..."
-            className="
-              h-11
-              w-full
-              rounded-[16px]
-              border
-              border-slate-200/80
-              bg-white
-              pr-10
-              pl-14
-              text-xs
-              font-medium
-              text-slate-800
-              shadow-sm
-              outline-none
-              transition-all
-              placeholder:text-slate-400
-              focus:border-indigo-400
-              focus:ring-2
-              focus:ring-indigo-500/15
-              dark:border-white/[0.07]
-              dark:bg-neutral-900
-              dark:text-white
-              dark:placeholder:text-slate-500
-              sm:text-sm
-            "
-          />
-
-          <Search
-            size={17}
-            className="
-              pointer-events-none
-              absolute
-              right-3.5
-              text-slate-400
-              dark:text-slate-500
-            "
-          />
-
-          {localSearch.trim() && (
-            <button
-              type="submit"
-              className="
-                absolute
-                left-2.5
-                rounded-[10px]
-                bg-indigo-600
-                px-3
-                py-1.5
-                text-[11px]
-                font-bold
-                text-white
-                transition
-                active:scale-95
-              "
-            >
-              بحث
-            </button>
-          )}
-        </div>
-      </motion.form>
-
-      <motion.div
-        variants={itemVariants}
-        className="
-          flex
-          w-full
-          flex-wrap
-          items-center
-          justify-center
-          gap-x-2
-          gap-y-1
-          text-center
-          text-[11px]
-          font-bold
-          text-slate-600
-          dark:text-slate-300
-          sm:text-xs
-        "
-      >
-        <button
-          type="button"
-          onClick={() =>
-            onNavigate(
-              'inventory',
-            )
-          }
-          className="
-            transition-colors
-            hover:text-indigo-600
-            dark:hover:text-indigo-400
-          "
-        >
-          <span
-            className="
-              font-black
-              text-slate-900
-              dark:text-white
-            "
-          >
-            {totalItemsCount}
-          </span>{' '}
-          صنف
-        </button>
-
-        <span
-          className="
-            text-slate-300
-            dark:text-neutral-700
-          "
-        >
-          •
-        </span>
-
-        <button
-          type="button"
-          onClick={() =>
-            onNavigate(
-              'inventory',
-            )
-          }
-          className="
-            transition-colors
-            hover:text-indigo-600
-            dark:hover:text-indigo-400
-          "
-        >
-          <span
-            className="
-              font-black
-              text-slate-900
-              dark:text-white
-            "
-          >
-            {totalQuantitySum.toLocaleString(
-              'en-US',
-              {
-                maximumFractionDigits: 0,
-              },
-            )}
-          </span>{' '}
-          إجمالي الكمية
-        </button>
-
-        <span
-          className="
-            text-slate-300
-            dark:text-neutral-700
-          "
-        >
-          •
-        </span>
-
-        <button
-          type="button"
-          onClick={() =>
-            onNavigate(
-              'inventory',
-            )
-          }
-          className="
-            transition-colors
-            hover:text-indigo-600
-            dark:hover:text-indigo-400
-          "
-        >
-          <span
-            className="
-              font-black
-              text-slate-900
-              dark:text-white
-            "
-          >
-            {
-              activeReservationsCount
-            }
-          </span>{' '}
-          محجوز
-        </button>
-
-        <span
-          className="
-            text-slate-300
-            dark:text-neutral-700
-          "
-        >
-          •
-        </span>
-
-        <button
-          type="button"
-          onClick={() =>
-            onNavigate(
-              'inventory',
-            )
-          }
-          className="
-            transition-colors
-            hover:text-indigo-600
-            dark:hover:text-indigo-400
-          "
-        >
-          <span
-            className={
-              lowStockCount > 0
-                ? 'font-black text-amber-600 dark:text-amber-400'
-                : 'font-black text-slate-900 dark:text-white'
-            }
-          >
-            {lowStockCount}
-          </span>{' '}
-          منخفض
-        </button>
-      </motion.div>
-
-      <motion.section
-        variants={itemVariants}
-      >
-        <div
-          className="
-            mb-2
-            flex
-            min-h-7
-            items-center
-            gap-2
-          "
-        >
-          <h2
-            className="
-              text-base
-              shrink-0
-              font-bold
-              text-slate-900
-              dark:text-white
-              sm:text-lg
-            "
-          >
-            الأقسام
-          </h2>
-
-          <div className="flex h-7 min-w-0 flex-1 items-center justify-center">
-            {isSyncing && (
-              <div role="status" className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full border border-slate-200/70 bg-white/75 px-2 py-0.5 text-[10px] font-semibold leading-5 text-slate-500 shadow-sm dark:border-white/[0.06] dark:bg-neutral-900/75 dark:text-slate-400">
-                <span className="flex h-5 w-5 shrink-0 animate-pulse items-center justify-center rounded-md border border-slate-200/70 bg-slate-100/70 text-slate-400 dark:border-white/[0.06] dark:bg-white/[0.05] dark:text-slate-500" aria-hidden="true">
-                  <Layers3 size={10} strokeWidth={2.2} />
-                </span>
-                <span className="min-w-0 truncate">جاري تحديث بقية المخزون...</span>
-              </div>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              onNavigate(
-                'inventory',
-              )
-            }
-            className="
-              flex
-              shrink-0
-              items-center
-              gap-1
-              text-[11px]
-              font-bold
-              text-indigo-600
-              transition
-              active:scale-95
-              dark:text-indigo-400
-              sm:text-xs
-            "
-          >
-            عرض الكل
-            <ChevronLeft
-              size={14}
-            />
-          </button>
-        </div>
-
-        <div
-          className={`
-            rounded-[18px]
-            border
-            border-slate-200/70
-            bg-white
-            shadow-sm
-            divide-y
-            divide-slate-100
-            dark:border-white/[0.07]
-            dark:bg-neutral-900
-            dark:divide-white/[0.05]
-            ${dashboardCategories.length > 4
-              ? 'max-h-[280px] overflow-y-auto custom-scrollbar'
-              : 'overflow-hidden'}
-          `}
-        >
-          {dashboardCategories.map(
-            (
-              category,
-              index,
-            ) => {
-              const categorySummary = inventorySummary.byCategory.get(category.id);
-
-              const visual =
-                getCategoryVisual(
-                  category,
-                  index,
-                );
-
-              const IconComponent =
-                visual.icon;
-
-              const isPieceUnit =
-                category.defaultUnit ===
-                'pieces';
-
-              const totalQty = categorySummary?.quantity || 0;
-
-              return (
-                <motion.button
-                  key={
-                    category.id
-                  }
-                  type="button"
-                  onClick={() =>
-                    onSelectCategory(
-                      category.id,
-                    )
-                  }
-                  whileTap={{
-                    scale: 0.99,
-                  }}
-                  className="
-                    flex
-                    min-h-[70px]
-                    w-full
-                    items-center
-                    gap-3
-                    px-3
-                    py-2.5
-                    text-right
-                    transition-colors
-                    hover:bg-slate-50/70
-                    dark:hover:bg-neutral-800/40
-                  "
-                >
-                  <div
-                    className={`
-                      flex
-                      h-9
-                      w-9
-                      shrink-0
-                      items-center
-                      justify-center
-                      rounded-[12px]
-                      ${visual.color}
-                    `}
-                  >
-                    <IconComponent
-                      size={18}
-                      strokeWidth={2}
-                    />
-                  </div>
-
-                  <div
-                    className="
-                      min-w-0
-                      flex-1
-                    "
-                  >
-                    <h3
-                      className="
-                        break-words
-                        text-xs
-                        font-bold
-                        text-slate-900
-                        dark:text-white
-                        sm:text-sm
-                      "
-                    >
-                      {
-                        category.name
-                      }
-                    </h3>
-
-                    <p
-                      className="
-                        mt-0.5
-                        text-[10px]
-                        font-medium
-                        text-slate-400
-                        dark:text-slate-500
-                      "
-                    >
-                      {
-                        visual.subtitle
-                      }
-                    </p>
-
-                  </div>
-
-                  <div
-                    className="
-                      shrink-0
-                      text-left
-                      leading-tight
-                    "
-                  >
-                    <div
-                      className="
-                        text-[10px]
-                        font-extrabold
-                        text-slate-700
-                        dark:text-slate-200
-                      "
-                    >
-                      {categorySummary?.count || 0}{' '}
-                      صنف
-                    </div>
-
-                    <div
-                      className="
-                        mt-0.5
-                        text-[9px]
-                        font-semibold
-                        text-slate-400
-                        dark:text-slate-500
-                      "
-                    >
-                      {totalQty.toLocaleString(
-                        'en-US',
-                        {
-                          maximumFractionDigits:
-                            isPieceUnit
-                              ? 0
-                              : 1,
-                        },
-                      )}{' '}
-                      {isPieceUnit
-                        ? 'قطعة'
-                        : 'م²'}
-                    </div>
-                  </div>
-                </motion.button>
-              );
-            },
-          )}
-        </div>
-      </motion.section>
-
-      <motion.section
-        variants={itemVariants}
-      >
-        <div
-          className="
-            mb-2
-            flex
-            items-center
-            justify-between
-          "
-        >
-          <h2
-            className="
-              text-base
-              font-bold
-              text-slate-900
-              dark:text-white
-              sm:text-lg
-            "
-          >
-            آخر الحركات
-          </h2>
-
-          <button
-            type="button"
-            onClick={() =>
-              onNavigate('logs')
-            }
-            className="
-              flex
-              items-center
-              gap-1
-              text-[11px]
-              font-bold
-              text-indigo-600
-              transition
-              active:scale-95
-              dark:text-indigo-400
-              sm:text-xs
-            "
-          >
-            عرض الكل
-            <ChevronLeft
-              size={14}
-            />
-          </button>
-        </div>
-
-        {safeLogs.length > 0 ? (
-          <div
-            className="
-              overflow-hidden
-              rounded-[18px]
-              border
-              border-slate-200/70
-              bg-white
-              shadow-sm
-              divide-y
-              divide-slate-100
-              dark:border-white/[0.07]
-              dark:bg-neutral-900
-              dark:divide-white/[0.05]
-            "
-          >
-            {safeLogs
-              .slice(0, 3)
-              .map(
-                (
-                  log,
-                  index,
-                ) => {
-                  const action =
-                    log.action ||
-                    '';
-
-                  const isAdd =
-                    action.includes(
-                      'إضافة',
-                    ) ||
-                    action.includes(
-                      'اضافة',
-                    ) ||
-                    action.includes(
-                      'إنشاء',
-                    );
-
-                  const isReservation =
-                    action.includes(
-                      'حجز',
-                    );
-
-                  const userName =
-                    (log as any)
-                      .userName ||
-                    (log.user
-                      ? log.user.split(
-                          '@',
-                        )[0]
-                      : 'مستخدم');
-
-                  let timeAgo =
-                    'الآن';
-
-                  if (
-                    log.timestamp
-                  ) {
-                    try {
-                      const date =
-                        (log
-                          .timestamp as any)
-                          .toDate
-                          ? (
-                              log.timestamp as any
-                            ).toDate()
-                          : (
-                                log.timestamp as any
-                              )
-                              .seconds
-                            ? new Date(
-                                (
-                                  log.timestamp as any
-                                )
-                                  .seconds *
-                                  1000,
-                              )
-                            : new Date(
-                                log.timestamp as any,
-                              );
-
-                      if (
-                        !Number.isNaN(
-                          date.getTime(),
-                        )
-                      ) {
-                        const diffMinutes =
-                          Math.floor(
-                            (Date.now() -
-                              date.getTime()) /
-                              60000,
-                          );
-
-                        const diffHours =
-                          Math.floor(
-                            diffMinutes /
-                              60,
-                          );
-
-                        if (
-                          diffMinutes <
-                          1
-                        ) {
-                          timeAgo =
-                            'الآن';
-                        } else if (
-                          diffMinutes <
-                          60
-                        ) {
-                          timeAgo = `منذ ${diffMinutes} د`;
-                        } else if (
-                          diffHours <
-                          24
-                        ) {
-                          timeAgo = `منذ ${diffHours} س`;
-                        } else {
-                          timeAgo =
-                            date.toLocaleDateString(
-                              'ar-EG',
-                              {
-                                month:
-                                  'numeric',
-                                day: 'numeric',
-                              },
-                            );
-                        }
-                      }
-                    } catch {
-                      timeAgo =
-                        'منذ قليل';
-                    }
-                  }
-
-                  return (
-                    <div
-                      key={
-                        log.id ||
-                        index
-                      }
-                      className="
-                        flex
-                        min-h-[56px]
-                        items-center
-                        justify-between
-                        gap-2.5
-                        px-3
-                        py-2.5
-                        transition-colors
-                        hover:bg-slate-50/60
-                        dark:hover:bg-neutral-800/40
-                      "
-                    >
-                      <div
-                        className="
-                          flex
-                          min-w-0
-                          flex-1
-                          items-center
-                          gap-2.5
-                        "
-                      >
-                        <div
-                          className="
-                            flex
-                            h-8
-                            w-8
-                            shrink-0
-                            items-center
-                            justify-center
-                            rounded-full
-                            border
-                            border-slate-200
-                            bg-slate-100
-                            text-xs
-                            font-bold
-                            text-slate-700
-                            dark:border-neutral-700
-                            dark:bg-neutral-800
-                            dark:text-slate-300
-                          "
-                        >
-                          {userName
-                            .charAt(
-                              0,
-                            )
-                            .toUpperCase()}
-                        </div>
-
-                        <div
-                          className="
-                            min-w-0
-                            flex-1
-                          "
-                        >
-                          <p
-                            className="
-                              break-words
-                              text-xs
-                              font-semibold
-                              text-slate-900
-                              dark:text-white
-                            "
-                          >
-                            {
-                              userName
-                            }{' '}
-                            {action}
-                          </p>
-
-                          {log.tileName && (
-                            <p
-                              className="
-                                mt-0.5
-                                break-words
-                                text-[10px]
-                                font-semibold
-                                text-indigo-600
-                                dark:text-indigo-400
-                                sm:text-[11px]
-                              "
-                            >
-                              {
-                                log.tileName
-                              }
-                              {log.details
-                                ? ` - ${log.details}`
-                                : ''}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div
-                        className="
-                          flex
-                          shrink-0
-                          items-center
-                          gap-2
-                        "
-                      >
-                        <span
-                          className="
-                            text-[10px]
-                            font-medium
-                            text-slate-400
-                            dark:text-slate-500
-                          "
-                        >
-                          {timeAgo}
-                        </span>
-
-                        <div
-                          className={`
-                            flex
-                            h-7
-                            w-7
-                            items-center
-                            justify-center
-                            rounded-[9px]
-                            ${
-                              isAdd
-                                ? 'bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400'
-                                : isReservation
-                                  ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
-                                  : 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400'
-                            }
-                          `}
-                        >
-                          {isAdd ? (
-                            <Plus
-                              size={
-                                13
-                              }
-                            />
-                          ) : isReservation ? (
-                            <UserCheck
-                              size={
-                                13
-                              }
-                            />
-                          ) : (
-                            <Pencil
-                              size={
-                                13
-                              }
-                            />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                },
-              )}
-          </div>
-        ) : (
-          <div
-            className="
-              flex
-              min-h-[54px]
-              items-center
-              justify-center
-              rounded-[16px]
-              border
-              border-slate-200/70
-              bg-white
-              px-4
-              py-3
-              text-center
-              text-[10px]
-              font-medium
-              text-slate-400
-              shadow-sm
-              dark:border-white/[0.07]
-              dark:bg-neutral-900
-              dark:text-slate-500
-            "
-          >
-            لا توجد حركات
-          </div>
-        )}
-      </motion.section>
+  return <div className="inventory-home" dir="rtl">
+    <motion.div className="home-welcome" {...enter(0)}>
+      <h2>مرحباً، <strong>{currentStaff?.name || 'المستخدم'}</strong></h2>
     </motion.div>
-  );
-};
 
-export default React.memo(
-  Dashboard,
-);
+    <motion.section className="home-search-section" aria-label="البحث في المخزون" {...enter(0.04)}>
+      <SearchCoachmark searchRef={searchRef} active={searching || filterOpen} userId={currentStaff?.id} />
+      <form role="search" className="home-search-glass" onSubmit={event => {
+        event.preventDefault();
+        if (!searching) { searchRef.current?.focus(); return; }
+        resultsRef.current?.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
+        searchRef.current?.blur();
+      }}>
+        <button className="home-search-lens" type="submit" aria-label="بحث"><Search size={27} strokeWidth={1.7} /></button>
+        <label className="home-search-input"><span className="sr-only">اسم الصنف أو الكود أو المقاس أو اللون</span>
+          <input ref={searchRef} type="search" placeholder="الكود، المقاس، اسم الصنف…" value={search}
+            onChange={event => setSearch(event.target.value)} enterKeyHint="search" autoComplete="off" />
+        </label>
+        {search && <button type="button" className="home-icon-button home-search-clear" aria-label="مسح نص البحث" onClick={() => { setSearch(''); searchRef.current?.focus(); }}><X size={17} /></button>}
+        <button ref={filterRef} type="button" className={`home-filter-toggle${filterCount ? ' has-filters' : ''}`}
+          aria-label={`تصفية البحث${filterCount ? `، ${filterCount} فلاتر مفعلة` : ''}`}
+          aria-haspopup="dialog" aria-expanded={filterOpen} onClick={() => { searchRef.current?.blur(); setFilterOpen(true); }}>
+          <SlidersHorizontal size={23} strokeWidth={1.7} />{filterCount > 0 && <span className="home-filter-badge">{filterCount}</span>}
+        </button>
+      </form>
+      {filterCount > 0 && <div className="home-applied-filters" aria-label="التصفية المطبقة">
+        {(Object.keys(filters) as (keyof Filters)[]).filter(key => filters[key]).map(key => <button type="button" key={key}
+          onClick={() => setFilters(previous => ({ ...previous, [key]: '' }))}
+          aria-label={`إزالة فلتر ${key === 'categoryId' ? safeCategories.find(category => category.id === filters[key])?.name || 'القسم' : filters[key]}`}>
+          {key === 'categoryId' ? safeCategories.find(category => category.id === filters[key])?.name || 'القسم' : <bdi>{filters[key]}</bdi>}<X size={12} />
+        </button>)}
+      </div>}
+      <div className="home-sync-slot" role="status" aria-live="polite">
+        {isSyncing && <p className="home-sync"><span aria-hidden="true" />جارٍ تحديث بقية المخزون…</p>}
+      </div>
+    </motion.section>
+
+    {searching ? <section className="home-search-results" ref={resultsRef} aria-labelledby={resultId} aria-busy={isSyncing || search !== deferredSearch}>
+      <div className="home-section-heading"><div><h2 id={resultId}>نتائج البحث</h2><p role="status">{number(matches.length, 0)} صنف مطابق{isSyncing ? ' حتى الآن' : ''}</p></div>
+        <button type="button" className="home-text-button" onClick={clearSearch}>إلغاء البحث</button>
+      </div>
+      {matches.length ? <div className="home-results-list">{matches.slice(0, visibleResultCount).map(item => {
+        const key = `${item.categoryId}:${item.id}`;
+        const category = safeCategories.find(category => category.id === item.categoryId);
+        const unit = (item.unitType || category?.defaultUnit) === 'pieces' ? 'قطعة' : 'م²';
+        const reserved = (item.reservations || []).reduce((sum, reservation) => sum + (Number(reservation.meters) || 0), 0);
+        const available = Math.max(0, quantity(item) - reserved);
+        const expanded = expandedItem === key;
+        return <article className="home-result" key={key}>
+          <button type="button" className="home-result-summary" aria-expanded={expanded} onClick={() => setExpandedItem(expanded ? null : key)}>
+            <span className="home-result-art">{item.image ? <img src={item.image} alt="" loading="lazy" /> : <PackageOpen size={24} strokeWidth={1.4} />}</span>
+            <span className="home-result-label"><strong><bdi>{item.name || item.shade || 'صنف'}</bdi></strong><span>{[category?.name, item.size, item.surface, item.quality].filter(Boolean).map((text, index) => <React.Fragment key={index}>{index > 0 && ' · '}<bdi>{text}</bdi></React.Fragment>)}</span></span>
+            <span className="home-result-available"><small>المتاح</small><strong><bdi>{number(available)}</bdi> <small>{unit}</small></strong>{reserved > 0 && <span>محجوز <bdi>{number(reserved)}</bdi></span>}</span>
+            <ChevronDown className={expanded ? 'is-open' : ''} size={17} />
+          </button>
+          <AnimatePresence initial={false}>{expanded && <motion.div className="home-result-details" initial={{ height: reduceMotion ? 'auto' : 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: reduceMotion ? 'auto' : 0, opacity: 0 }}>
+            <dl><div><dt>الكمية الإجمالية</dt><dd><bdi>{number(quantity(item))}</bdi> {unit}</dd></div><div><dt>المحجوز</dt><dd><bdi>{number(reserved)}</bdi> {unit}</dd></div><div><dt>المتاح</dt><dd><bdi>{number(available)}</bdi> {unit}</dd></div>
+              {[['الموديل', item.shade], ['اللون', item.color], ['الماركة', item.brand], ['النوع', item.itemType], ['المادة', item.materialOrGlass]].map(([label, value]) => value && <div key={label}><dt>{label}</dt><dd><bdi>{value}</bdi></dd></div>)}
+              {(item.customFieldSnapshot || []).map(field => <div key={field.fieldId}><dt>{field.label}</dt><dd><bdi>{field.value} {field.suffix || ''}</bdi></dd></div>)}
+            </dl>
+            {item.notes && <p className="home-result-notes">{item.notes}</p>}
+            <div className="home-result-actions">
+              {onOpenReservation && <button type="button" className="home-primary-button" onClick={() => onOpenReservation(item)}><Bookmark size={16} />الحجوزات</button>}
+              {onEditTile && <button type="button" className="home-secondary-button" onClick={() => onEditTile(item)}><Pencil size={16} />تعديل</button>}
+              {onViewModelLogs && <button type="button" className="home-text-button" onClick={() => onViewModelLogs(item.name)}><History size={15} />سجل الصنف</button>}
+            </div>
+          </motion.div>}</AnimatePresence>
+        </article>;
+      })}{matches.length > visibleResultCount && <button className="home-secondary-button home-load-more" type="button" onClick={() => setVisibleResultCount(value => value + 12)}>عرض المزيد من النتائج</button>}</div>
+        : <div className="home-empty"><Search size={27} strokeWidth={1.3} /><h3>{isSyncing ? 'جارٍ البحث في المخزون…' : 'لا توجد أصناف مطابقة'}</h3><p>جرّب اسماً آخر أو عدّل التصفية.</p><button type="button" className="home-text-button" onClick={clearSearch}>مسح البحث والتصفية</button></div>}
+    </section> : <>
+      <motion.div className="home-stats" {...enter(0.08)}>
+        <span><bdi>{number(items.length, 0)}</bdi> صنف</span><i />
+        <span>{stats.meters > 0 || stats.pieces === 0 ? <><bdi>{number(stats.meters)}</bdi> م²</> : null}{stats.meters > 0 && stats.pieces > 0 && ' + '}{stats.pieces > 0 && <><bdi>{number(stats.pieces)}</bdi> قطعة</>}</span><i />
+        <span><bdi>{number(stats.reservations, 0)}</bdi> حجز</span><i />
+        <span className={stats.lowStock ? 'home-low-stock' : ''}><bdi>{number(stats.lowStock, 0)}</bdi> منخفض</span>
+      </motion.div>
+      <motion.section className="home-categories-section" {...enter(0.15)}>
+        <div className="home-section-heading"><h2>الأقسام</h2><button type="button" className="home-text-button" onClick={() => onNavigate('inventory')}>عرض الكل<ChevronLeft size={15} /></button></div>
+        {safeCategories.length ? <div className="home-categories-rail" role="list" aria-label="أقسام المخزون">{safeCategories.map((category, index) => {
+          const summary = stats.byCategory.get(category.id);
+          const defaultPieces = category.defaultUnit === 'pieces';
+          return <div role="listitem" key={category.id} style={{ '--department-order': Math.min(index, 3) } as React.CSSProperties}><button type="button" className="home-category department-choice" onClick={() => onSelectCategory(category.id)}>
+            <span className="department-mark" aria-hidden="true"><CategorySymbol category={category} size={30} /><ChevronLeft size={13} className="department-direction" /></span>
+            <strong>{category.name}</strong><span className="category-caption"><bdi>{summary?.count || 0}</bdi> صنف</span>
+            <small>{summary && summary.meters > 0 && <><bdi>{number(summary.meters)}</bdi> م²</>}{summary && summary.meters > 0 && summary.pieces > 0 && ' + '}{summary && summary.pieces > 0 && <><bdi>{number(summary.pieces)}</bdi> قطعة</>}{(!summary || (!summary.meters && !summary.pieces)) && <>0 {defaultPieces ? 'قطعة' : 'م²'}</>}</small>
+          </button></div>;
+        })}</div> : <p className="home-empty">لا توجد أقسام متاحة لهذا الحساب.</p>}
+      </motion.section>
+      <motion.section className="home-activity-section" {...enter(0.28)}>
+        <div className="home-section-heading"><div><h2>آخر الحركات</h2><p>أحدث التغييرات على المخزون</p></div><button type="button" className="home-text-button" onClick={() => onNavigate('logs')}>عرض الكل<ChevronLeft size={15} /></button></div>
+        {recentLogs.length ? <ActivityTimeline logs={recentLogs} categories={safeCategories} onViewModelLogs={inspect} /> : <div className="home-empty"><History size={26} strokeWidth={1.4} /><h3>لا توجد حركات بعد</h3><p>ستظهر عمليات الإضافة والتعديل والحجز هنا.</p></div>}
+      </motion.section>
+    </>}
+    <ItemDetailsSheet selection={inspecting} tiles={items} logs={logs} categories={safeCategories} onClose={() => setInspecting(null)} onExited={restoreInspectorFocus} onEdit={onEditTile} onReserve={onOpenReservation} onViewHistory={onViewModelLogs} />
+    {filterOpen && <HomeSearchFilters filters={filters} categories={safeCategories} items={items} anchor={filterRef.current}
+      onDismiss={() => setFilterOpen(false)} onApply={next => { setFilters(next); setFilterOpen(false); }} />}
+  </div>;
+}
