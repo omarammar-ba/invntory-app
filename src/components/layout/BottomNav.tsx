@@ -32,16 +32,16 @@ export default function BottomNav({ view, isAddingNew = false, isSearching = fal
         const state = scrollState.current;
         const focused = document.activeElement;
         const typing = focused instanceof HTMLTextAreaElement || (focused instanceof HTMLInputElement && !['button', 'submit', 'radio', 'checkbox', 'file'].includes(focused.type));
-        if (document.body.style.overflow === 'hidden' || typing) { state.lastY = current; state.direction = 0; state.distance = 0; frame = 0; return; }
+        if (document.body.style.overflow === 'hidden' || typing || (focused instanceof HTMLElement && focused.closest('.atelier-nav') && focused.matches(':focus-visible'))) { state.lastY = current; state.direction = 0; state.distance = 0; frame = 0; return; }
         const delta = current - state.lastY;
         if (Math.abs(delta) >= 2) {
           const direction = Math.sign(delta);
           state.distance = direction === state.direction ? state.distance + Math.abs(delta) : Math.abs(delta);
           state.direction = direction;
           state.lastY = current;
-          if (current < 50) { setCompact(false); state.distance = 0; }
-          else if (direction > 0 && current > 140 && state.distance >= 36) { setCompact(true); state.distance = 0; }
-          else if (direction < 0 && state.distance >= 28) { setCompact(false); state.distance = 0; }
+          if (current < 24) { setCompact(false); state.distance = 0; }
+          else if (direction > 0 && current > 80 && state.distance >= 28) { setCompact(true); state.distance = 0; }
+          else if (direction < 0 && state.distance >= 20) { setCompact(false); state.distance = 0; }
         }
         frame = 0;
       });
@@ -75,15 +75,16 @@ export default function BottomNav({ view, isAddingNew = false, isSearching = fal
     { key: 'history', label: 'الحركات', icon: History, action: onHistory || onLogs || (() => {}) },
     { key: 'add', label: 'إضافة', icon: Plus, action: onAdd },
   ];
-  return <nav className={`atelier-nav${compact ? ' is-compact' : ''}${keyboardOpen ? ' is-keyboard-open' : ''}`} aria-label="التنقل الرئيسي" dir="rtl">
+  return <nav className={`atelier-nav${compact ? ' is-compact' : ''}${keyboardOpen ? ' is-keyboard-open' : ''}`} aria-label="التنقل الرئيسي" aria-hidden={keyboardOpen || undefined} dir="rtl">
     <div className="atelier-nav-glass">
       {links.map(({ key, label, icon: Icon, action }) => <button key={key} type="button" onClick={action}
         className={`atelier-nav-link${key === 'search' ? ' atelier-nav-search' : ''}${active === key ? ' is-active' : ''}`}
+        tabIndex={keyboardOpen ? -1 : undefined}
         aria-label={key === 'add' ? 'إضافة صنف جديد' : key === 'search' ? 'البحث عن صنف' : label}
         aria-current={active === key && key !== 'add' && key !== 'search' ? 'page' : undefined}
         aria-pressed={key === 'search' ? active === key : undefined}>
         {active === key && key !== 'search' && <span className="atelier-nav-active" aria-hidden="true" />}
-        <span className="atelier-nav-icon"><Icon size={25} strokeWidth={active === key ? 1.9 : 1.65} fill="none" /></span>
+        <span className="atelier-nav-icon"><Icon size={25} strokeWidth={1.8} fill="none" /></span>
         <span className="atelier-nav-label">{label}</span>
       </button>)}
     </div>

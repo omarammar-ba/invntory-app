@@ -1,7 +1,6 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import type { Category, ViewMode, StaffMember } from '@/types';
-import { House, History, Settings2, X, UsersRound, DatabaseBackup, LogOut, Layers } from 'lucide-react';
-import { CategorySymbol, categoryTone } from '@/components/ui/CategorySymbol';
+import { Settings2, X, UsersRound, DatabaseBackup, LogOut, Layers } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 
 interface SidebarProps {
@@ -25,17 +24,13 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
-  isOpen, onClose, activeTab, onChangeTab, categories, activeCategoryId, activeCategory,
-  onChangeCategory, onSelectCategory, onManageCategories, onOpenCategoryManager,
+  isOpen, onClose, activeTab,
   onOpenSettings, onOpenStaffManager, onOpenBackupModal, currentStaff, onLogout,
 }) => {
   const mobile = useIsMobile();
   const asideRef = useRef<HTMLElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
-  const selected = activeCategoryId || activeCategory;
-  const selectCategory = onSelectCategory || onChangeCategory;
-  const manageCategories = onOpenCategoryManager || onManageCategories;
   const role = currentStaff?.role ?? null;
 
   useLayoutEffect(() => {
@@ -65,7 +60,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [mobile, isOpen]);
 
   const run = (action: () => void) => { action(); onClose(); };
-  const link = (label: string, Icon: typeof House, active: boolean, action: () => void) =>
+  const link = (label: string, Icon: typeof Settings2, active: boolean, action: () => void) =>
     <button type="button" className="atelier-menu-link" aria-current={active ? 'page' : undefined} onClick={() => run(action)}>
       <Icon size={21} strokeWidth={1.7} aria-hidden="true" /><span>{label}</span>
     </button>;
@@ -79,19 +74,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         <button type="button" className="atelier-menu-close md:hidden" onClick={onClose} aria-label="إغلاق القائمة"><X size={20} /></button>
       </header>
       <div className="atelier-menu-content">
-        {link('لوحة التحكم الرئيسية', House, activeTab === 'dashboard', () => onChangeTab('dashboard'))}
-        <section className="atelier-menu-group">
-          <div className="atelier-menu-group-heading"><h2>أقسام المعرض</h2>{manageCategories && <button type="button" onClick={() => manageCategories()} title="إدارة الأقسام">+ تخصيص</button>}</div>
-          {categories.filter(category => role !== 'employee' || category.visibleToEmployees === true).map(category =>
-            <button type="button" key={category.id} className={`atelier-menu-link atelier-menu-category ${categoryTone(category)}`}
-              aria-current={activeTab === 'inventory' && selected === category.id ? 'page' : undefined}
-              onClick={() => run(() => { selectCategory?.(category.id); onChangeTab('inventory'); })}>
-              <CategorySymbol category={category} size={22} /><span>{category.name}</span>
-            </button>)}
-        </section>
-        <section className="atelier-menu-group"><div className="atelier-menu-group-heading"><h2>العمليات والسجلات</h2></div>
-          {link('سجل الحركات والنشاطات', History, activeTab === 'logs', () => onChangeTab('logs'))}
-        </section>
         <section className="atelier-menu-group"><div className="atelier-menu-group-heading"><h2>الإدارة والنظام</h2></div>
           {role !== 'employee' && onOpenStaffManager && link('الموظفين', UsersRound, activeTab === 'staff', onOpenStaffManager)}
           {onOpenBackupModal && link('النسخ الاحتياطي', DatabaseBackup, activeTab === 'backup', onOpenBackupModal)}

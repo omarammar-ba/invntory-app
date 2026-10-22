@@ -2,14 +2,15 @@ import React, { useDeferredValue, useEffect, useId, useMemo, useRef, useState } 
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   Bookmark, ChevronDown, ChevronLeft,
-  History, PackageOpen, Pencil, Search, SlidersHorizontal, X,
+  History, Image as ImageIcon, PackageOpen, Pencil, Search, SlidersHorizontal, X,
 } from 'lucide-react';
 import type { Category, LogEntry, StaffMember, Tile } from '@/types';
 import { motionEase } from '@/styles/motion';
 import HomeSearchFilters from './HomeSearchFilters';
 import SearchCoachmark from './SearchCoachmark';
 import ActivityTimeline from '@/components/ui/ActivityTimeline';
-import { CategorySymbol } from '@/components/ui/CategorySymbol';
+import { CategorySymbol, categoryTone } from '@/components/ui/CategorySymbol';
+import ImageModal from '@/features/inventory/ImageModal';
 import ItemDetailsSheet, { type ItemSelection } from '@/components/ui/ItemDetailsSheet';
 import {
   activeFilterCount, EMPTY_HOME_FILTERS, getLogDate,
@@ -48,6 +49,9 @@ export default function Dashboard({
   const [filters, setFilters] = useState<Filters>({ ...EMPTY_HOME_FILTERS });
   const [filterOpen, setFilterOpen] = useState(false);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
+  const imageTrigger = useRef<HTMLElement | null>(null);
+  const showImage = (src: string, trigger: HTMLElement) => { imageTrigger.current = trigger; searchRef.current?.blur(); setViewingImage(src); };
   const [visibleResultCount, setVisibleResultCount] = useState(12);
   const localSearchRef = useRef<HTMLInputElement>(null);
   const searchRef = searchInputRef || localSearchRef;
@@ -98,8 +102,8 @@ export default function Dashboard({
     .slice(0, 4).map(entry => entry.log), [logs]);
 
   const enter = (delay: number) => reduceMotion ? {} : {
-    initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.38, delay, ease: motionEase },
+    initial: { opacity: 0.35, y: 6 }, animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.26, delay: delay * 0.4, ease: motionEase },
   };
   const clearSearch = () => { setSearch(''); setFilters({ ...EMPTY_HOME_FILTERS }); searchRef.current?.focus(); };
 
@@ -151,13 +155,17 @@ export default function Dashboard({
         const reserved = (item.reservations || []).reduce((sum, reservation) => sum + (Number(reservation.meters) || 0), 0);
         const available = Math.max(0, quantity(item) - reserved);
         const expanded = expandedItem === key;
+        const updated = getLogDate(item.updatedAt);
         return <article className="home-result" key={key}>
+          <div className="home-result-row">
+          {item.image && <button type="button" className="home-result-art home-result-photo" aria-label={`فتح صورة الصنف ${item.name}`} onClick={event => showImage(item.image, event.currentTarget)}><img src={item.image} alt="" loading="lazy" decoding="async" /><ImageIcon size={12} aria-hidden="true" /></button>}
           <button type="button" className="home-result-summary" aria-expanded={expanded} onClick={() => setExpandedItem(expanded ? null : key)}>
-            <span className="home-result-art">{item.image ? <img src={item.image} alt="" loading="lazy" /> : <PackageOpen size={24} strokeWidth={1.4} />}</span>
-            <span className="home-result-label"><strong><bdi>{item.name || item.shade || 'صنف'}</bdi></strong><span>{[category?.name, item.size, item.surface, item.quality].filter(Boolean).map((text, index) => <React.Fragment key={index}>{index > 0 && ' · '}<bdi>{text}</bdi></React.Fragment>)}</span></span>
+            {!item.image && <span className="home-result-art"><PackageOpen size={24} strokeWidth={1.4} /></span>}
+            <span className="home-result-label"><strong><bdi>{item.name || item.shade || 'صنف'}</bdi></strong><span>{[category?.name, item.size, item.surface, item.quality].filter(Boolean).map((text, index) => <React.Fragment key={index}>{index > 0 && ' · '}<bdi>{text}</bdi></React.Fragment>)}</span><small className="home-result-updated">آخر تحديث: {updated ? <time dateTime={updated.toISOString()}>{updated.toLocaleString('ar-JO', { dateStyle: 'short', timeStyle: 'short' })}</time> : 'غير مسجّل'}</small></span>
             <span className="home-result-available"><small>المتاح</small><strong><bdi>{number(available)}</bdi> <small>{unit}</small></strong>{reserved > 0 && <span>محجوز <bdi>{number(reserved)}</bdi></span>}</span>
             <ChevronDown className={expanded ? 'is-open' : ''} size={17} />
           </button>
+          </div>
           <AnimatePresence initial={false}>{expanded && <motion.div className="home-result-details" initial={{ height: reduceMotion ? 'auto' : 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: reduceMotion ? 'auto' : 0, opacity: 0 }}>
             <dl><div><dt>الكمية الإجمالية</dt><dd><bdi>{number(quantity(item))}</bdi> {unit}</dd></div><div><dt>المحجوز</dt><dd><bdi>{number(reserved)}</bdi> {unit}</dd></div><div><dt>المتاح</dt><dd><bdi>{number(available)}</bdi> {unit}</dd></div>
               {[['الموديل', item.shade], ['اللون', item.color], ['الماركة', item.brand], ['النوع', item.itemType], ['المادة', item.materialOrGlass]].map(([label, value]) => value && <div key={label}><dt>{label}</dt><dd><bdi>{value}</bdi></dd></div>)}
@@ -185,7 +193,7 @@ export default function Dashboard({
         {safeCategories.length ? <div className="home-categories-rail" role="list" aria-label="أقسام المخزون">{safeCategories.map((category, index) => {
           const summary = stats.byCategory.get(category.id);
           const defaultPieces = category.defaultUnit === 'pieces';
-          return <div role="listitem" key={category.id} style={{ '--department-order': Math.min(index, 3) } as React.CSSProperties}><button type="button" className="home-category department-choice" onClick={() => onSelectCategory(category.id)}>
+          return <div role="listitem" key={category.id} style={{ '--department-order': Math.min(index, 3) } as React.CSSProperties}><button type="button" className={`home-category department-choice ${categoryTone(category)}`} onClick={() => onSelectCategory(category.id)}>
             <span className="department-mark" aria-hidden="true"><CategorySymbol category={category} size={30} /><ChevronLeft size={13} className="department-direction" /></span>
             <strong>{category.name}</strong><span className="category-caption"><bdi>{summary?.count || 0}</bdi> صنف</span>
             <small>{summary && summary.meters > 0 && <><bdi>{number(summary.meters)}</bdi> م²</>}{summary && summary.meters > 0 && summary.pieces > 0 && ' + '}{summary && summary.pieces > 0 && <><bdi>{number(summary.pieces)}</bdi> قطعة</>}{(!summary || (!summary.meters && !summary.pieces)) && <>0 {defaultPieces ? 'قطعة' : 'م²'}</>}</small>
@@ -198,6 +206,7 @@ export default function Dashboard({
       </motion.section>
     </>}
     <ItemDetailsSheet selection={inspecting} tiles={items} logs={logs} categories={safeCategories} onClose={() => setInspecting(null)} onExited={restoreInspectorFocus} onEdit={onEditTile} onReserve={onOpenReservation} onViewHistory={onViewModelLogs} />
+    {viewingImage && <ImageModal src={viewingImage} onClose={() => { setViewingImage(null); window.requestAnimationFrame(() => imageTrigger.current?.focus({ preventScroll: true })); }} />}
     {filterOpen && <HomeSearchFilters filters={filters} categories={safeCategories} items={items} anchor={filterRef.current}
       onDismiss={() => setFilterOpen(false)} onApply={next => { setFilters(next); setFilterOpen(false); }} />}
   </div>;

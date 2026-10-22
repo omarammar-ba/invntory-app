@@ -13,6 +13,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import BottomNav from "@/components/layout/BottomNav";
 import InventoryWorkspace from "@/features/inventory/InventoryWorkspace";
 import StartupScreen from "@/components/ui/StartupScreen";
+import { orderHomeCategories } from '@/features/dashboard/dashboardModel';
 import {
   ListIcon,
   HomeIcon,
@@ -329,6 +330,7 @@ const App: React.FC = () => {
 
   const [initialInventoryReady, setInitialInventoryReady] = useState(false);
   const [startupWaitExpired, setStartupWaitExpired] = useState(false);
+  const [globalAddCategoryId, setGlobalAddCategoryId] = useState<string | null>(null);
 
   const [
     inventoryRefreshVersion,
@@ -860,6 +862,21 @@ const App: React.FC = () => {
       );
     }
 
+    // Open once each permitted collection has delivered its first page. Further
+    // pages still use the same queries and continue under the existing sync state.
+    let pendingInitialPages = (isAdmin || visibleCategoryIds.has('tiles') ? 1 : 0)
+      + (isAdmin || visibleCategoryIds.has('ceramics') ? 1 : 0)
+      + (isAdmin ? 1 : Array.from(visibleCategoryIds).filter(id => id !== 'tiles' && id !== 'ceramics').length);
+    const createFirstPageSignal = () => {
+      let signalled = false;
+      return () => {
+        if (signalled || cancelled) return;
+        signalled = true;
+        pendingInitialPages--;
+        if (pendingInitialPages === 0) setInitialInventoryReady(true);
+      };
+    };
+
     const mapPage = (
       snapshot: any,
       forcedCategoryId?: string
@@ -886,6 +903,7 @@ const App: React.FC = () => {
     ) => {
       let cursor: string | null = null;
       let accumulated: Tile[] = [];
+      const firstPageReady = createFirstPageSignal();
 
       try {
         while (!cancelled) {
@@ -924,6 +942,7 @@ const App: React.FC = () => {
               startTransition(() => setter(nextItems));
             }
           }
+          firstPageReady();
 
           if (snapshot.docs.length < pageSize) break;
 
@@ -947,6 +966,8 @@ const App: React.FC = () => {
         setInventorySyncError(
           'تعذر تحديث جزء من المخزون. اضغط إعادة المحاولة.'
         );
+      } finally {
+        firstPageReady();
       }
     };
 
@@ -1003,6 +1024,7 @@ const App: React.FC = () => {
             const preserveExisting = otherItems.some(
               item => item.categoryId === categoryId
             );
+            const firstPageReady = createFirstPageSignal();
 
             try {
               while (!cancelled) {
@@ -1031,6 +1053,7 @@ const App: React.FC = () => {
                     startTransition(() => setOtherItems(nextItems));
                   }
                 }
+                firstPageReady();
 
                 if (snapshot.docs.length < pageSize) break;
                 cursor = snapshot.docs[snapshot.docs.length - 1]?.id || null;
@@ -1053,6 +1076,8 @@ const App: React.FC = () => {
               setInventorySyncError(
                 'تعذر تحديث جزء من المخزون. اضغط إعادة المحاولة.'
               );
+            } finally {
+              firstPageReady();
             }
           })()
         );
@@ -1062,7 +1087,7 @@ const App: React.FC = () => {
     }
 
     void Promise.allSettled(inventoryLoads).then(() => {
-      if (!cancelled) { setLoading(false); setInitialInventoryReady(true); }
+      if (!cancelled) startTransition(() => { setLoading(false); setInitialInventoryReady(true); });
     });
 
     return () => {
@@ -1313,18 +1338,25 @@ const App: React.FC = () => {
     currentStaff?.role ===
     'employee';
 
+  // Scope cached records during render as well as during async reloads. A
+  // category that was revoked must not flash before effect cleanup runs.
+  const allowedItemCategoryIds = useMemo(() => new Set(categoriesReady
+    ? categories.filter(category => category.visibleToEmployees === true).map(category => category.id)
+    : []), [categories, categoriesReady]);
+
   const visiblePorcelainTiles =
     useMemo(
       () =>
         isEmployee
-          ? porcelainTiles.filter(
+          ? (allowedItemCategoryIds.has('tiles') ? porcelainTiles.filter(
               item =>
                 item.hiddenForStaff !==
                 true
-            )
+            ) : [])
           : porcelainTiles,
       [
         isEmployee,
+        allowedItemCategoryIds,
         porcelainTiles
       ]
     );
@@ -1333,14 +1365,15 @@ const App: React.FC = () => {
     useMemo(
       () =>
         isEmployee
-          ? ceramicTiles.filter(
+          ? (allowedItemCategoryIds.has('ceramics') ? ceramicTiles.filter(
               item =>
                 item.hiddenForStaff !==
                 true
-            )
+            ) : [])
           : ceramicTiles,
       [
         isEmployee,
+        allowedItemCategoryIds,
         ceramicTiles
       ]
     );
@@ -1351,12 +1384,14 @@ const App: React.FC = () => {
         isEmployee
           ? otherItems.filter(
               item =>
+                allowedItemCategoryIds.has(item.categoryId) &&
                 item.hiddenForStaff !==
                 true
             )
           : otherItems,
       [
         isEmployee,
+        allowedItemCategoryIds,
         otherItems
       ]
     );
@@ -3339,7 +3374,7 @@ const App: React.FC = () => {
           editingTile={editingTile}
           onCancel={() => setIsTileFormClosing(true)}
           onViewImage={setViewingImage}
-          activeCategoryId={activeCategoryId || undefined}
+          activeCategoryId={!editingTile && addItemSource === 'global' ? globalAddCategoryId || activeCategoryId || undefined : activeCategoryId || undefined}
           category={activeCategoryData}
           categories={categories}
           onCustomizeCategory={
@@ -3381,6 +3416,7 @@ const App: React.FC = () => {
           );
         }}
         onAdd={() => {
+          setGlobalAddCategoryId(orderHomeCategories(categories.filter(category => !isEmployee || category.visibleToEmployees === true))[0]?.id || activeCategoryId);
           setAddItemSource(
             'global'
           );

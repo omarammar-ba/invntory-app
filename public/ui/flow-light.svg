@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 1100" preserveAspectRatio="none"><defs>
+<linearGradient id="veil" x1="0" y1=".25" x2="1" y2=".55"><stop stop-color="#edf4fa" stop-opacity="0"/><stop offset=".5" stop-color="#d3e3f2" stop-opacity=".12"/><stop offset="1" stop-color="#d3e3f2" stop-opacity=".58"/></linearGradient>
+<linearGradient id="fold" x1=".18" y1=".9" x2="1" y2=".05"><stop stop-color="#d3e3f2" stop-opacity=".08"/><stop offset=".32" stop-color="#d3e3f2" stop-opacity=".24"/><stop offset=".52" stop-color="#9ccbec" stop-opacity=".34"/><stop offset=".7" stop-color="#d3e3f2" stop-opacity=".1"/><stop offset="1" stop-color="#edf4fa" stop-opacity="0"/></linearGradient>
+<linearGradient id="echo" x1=".1" y1="1" x2="1" y2=".1"><stop stop-color="#d3e3f2" stop-opacity="0"/><stop offset=".65" stop-color="#b9d8ef" stop-opacity=".26"/><stop offset="1" stop-color="#edf4fa" stop-opacity="0"/></linearGradient>
+<filter id="soften" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="4"/></filter>
+</defs><g filter="url(#soften)">
+<path d="M509-80C402 119 411 282 389 424C367 600 240 630-60 807V1170H550V-80Z" fill="url(#veil)"/>
+<path d="M544-60C458 204 521 356 395 523C317 625 185 635-60 716V885C112 749 193 799 300 711C455 572 491 268 544-60Z" fill="url(#fold)"/>
+<path d="M550 662C407 758 429 915 284 1170H550Z" fill="url(#echo)"/>
+<path d="M535 139C455 276 496 389 427 493C349 612 148 648-60 747V801C170 687 338 669 423 543C510 415 466 293 535 139Z" fill="url(#echo)" opacity=".55"/>
+</g></svg>

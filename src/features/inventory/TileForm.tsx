@@ -37,7 +37,8 @@ import {
   ResponsiveOverlay,
 } from '@/components/ui/ResponsiveOverlay';
 import { ActionFeedback } from '@/components/ui/ActionFeedback';
-import { CategorySymbol } from '@/components/ui/CategorySymbol';
+import { CategorySymbol, categoryTone } from '@/components/ui/CategorySymbol';
+import { orderHomeCategories } from '@/features/dashboard/dashboardModel';
 
 import {
   AppChoiceField,
@@ -1856,7 +1857,7 @@ const TileForm:
             categories.length >
               0
           ) {
-            return categories;
+            return orderHomeCategories(categories);
           }
 
           return [
@@ -2237,7 +2238,7 @@ const TileForm:
         </div>}
       >
         <div className="editor-intro">
-          <div className="editor-department"><CategorySymbol category={effectiveCategory} size={28} />
+          <div className={`editor-department ${categoryTone(effectiveCategory)}`}><CategorySymbol category={effectiveCategory} size={28} />
             {allowCategorySwitch && !editingTile ? <label><span className="sr-only">قسم الصنف</span>
               <select value={selectedCatId} onChange={event => handleCategorySwitch(event.target.value)}>
                 {allAvailableCats.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}

@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef } from 'react';
-import { Box, ChevronDown, Menu, ShieldCheck, UserRound } from 'lucide-react';
+import { ChevronDown, Menu, ShieldCheck, UserRound } from 'lucide-react';
 import { Category, StaffMember } from '@/types';
 import { orderHomeCategories } from '@/features/dashboard/dashboardModel';
 
@@ -34,7 +34,7 @@ function Header({ onOpenSidebar, title = 'إدارة مخزون', currentStaff, 
 
   return <>
     <header ref={headerRef} className="atelier-header app-safe-top" dir="rtl">
-      <div className="atelier-header-brand">{showBrandMark && <span className="atelier-brand-mark" aria-hidden="true"><Box size={29} strokeWidth={1.55} /></span>}
+      <div className="atelier-header-brand">{showBrandMark && <span className="atelier-brand-mark"><img src="/icons/icon-192.png" width="44" height="44" alt="شعار إدارة مخزون" decoding="async" /></span>}
         <div>{categories?.length && onSelectCategory ? <h1 className="header-category-title" aria-label={title}><label><span className="sr-only">القسم الحالي</span><select value={activeCategoryId} onChange={event => onSelectCategory(event.target.value)}>{orderHomeCategories(categories).map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select><ChevronDown size={15} aria-hidden="true" /></label></h1> : <h1>{title}</h1>}</div>
       </div>
       <div className="atelier-header-actions">
