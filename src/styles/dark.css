@@ -1,0 +1,304 @@
+/* V18: one graphite palette for every screen and portal.
+   No geometry, scroll, animation or data behavior is changed here. */
+@media screen {
+  :root.dark {
+    color-scheme: dark;
+    --dark-canvas: #121212;
+    --dark-paper: #1b1b1b;
+    --dark-surface: #242424;
+    --dark-raised: #2c2c2c;
+    --dark-line: #454545;
+    --dark-divider: #343434;
+    --dark-ink: #e6e6e6;
+    --dark-muted: #aaaaaa;
+    --dark-blue: #8ab4e0;
+    --dark-selected: #293747;
+    --dark-danger: #dfa0ab;
+    --dark-success: #9bc8b7;
+    --dark-warning: #d9bd8e;
+    --surface-page: var(--dark-canvas);
+    --surface-card: var(--dark-paper);
+    --surface-inner: var(--dark-surface);
+    --border-card: var(--dark-divider);
+    --border-inner: var(--dark-divider);
+    --workspace-ink: var(--dark-ink);
+    --workspace-muted: var(--dark-muted);
+    --workspace-paper: var(--dark-paper);
+    --workspace-line: var(--dark-divider);
+    --workspace-blue: var(--dark-blue);
+    accent-color: var(--dark-blue);
+    background: var(--dark-canvas);
+  }
+  :root.dark body,
+  :root.dark .app-surface-page,
+  :root.dark .workspace-login.workspace-login,
+  :root.dark .startup-screen,
+  :root.dark #app-launch-splash {
+    background: var(--dark-canvas);
+    color: var(--dark-ink);
+  }
+  :root.dark .atelier-app.app-viewport {
+    --home-ink: var(--dark-ink);
+    --home-muted: var(--dark-muted);
+    --home-line: var(--dark-divider);
+    --home-soft: var(--dark-surface);
+    --home-glass: var(--dark-surface);
+    --home-blue: var(--dark-blue);
+    background: var(--dark-canvas);
+    color: var(--dark-ink);
+  }
+  :root.dark .atelier-app::before,
+  :root.dark .atelier-app::after,
+  :root.dark .atelier-app[data-view="logs"]::before,
+  :root.dark .home-search-glass::after {
+    display: none;
+    animation: none;
+    background: none;
+  }
+
+  /* Preserve the approved glass and its blur while recoloring the material.
+     Keep all existing icon anchors and scroll behavior untouched. */
+  :root.dark .atelier-header {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  :root.dark .atelier-header::before {
+    background: linear-gradient(180deg, #1b1b1bcc, #1b1b1b85 65%, #1b1b1b00);
+  }
+  :root.dark .atelier-sidebar {
+    background: #1b1b1bed;
+    border-color: var(--dark-divider);
+  }
+  :root.dark .atelier-nav .atelier-nav-glass {
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  :root.dark .atelier-nav .atelier-nav-glass::before {
+    background: linear-gradient(135deg, #2c2c2cad, #1b1b1bb3);
+    border-color: var(--dark-line);
+    box-shadow: 0 8px 24px #00000040, inset 0 1px 0 #363636;
+    backdrop-filter: blur(30px) saturate(1.5);
+    -webkit-backdrop-filter: blur(30px) saturate(1.5);
+  }
+  :root.dark .atelier-nav .atelier-nav-active,
+  :root.dark .atelier-nav.is-compact .atelier-nav-active {
+    background: linear-gradient(160deg, #ffffff10, #ffffff06);
+    border-color: #ffffff00;
+    box-shadow: inset 0 1px 0 #ffffff0c;
+  }
+  :root.dark .atelier-nav .atelier-nav-link { color: var(--dark-muted); }
+  :root.dark .atelier-nav .atelier-nav-link.is-active,
+  :root.dark .atelier-nav .atelier-nav-search .atelier-nav-label { color: var(--dark-blue); }
+  :root.dark .atelier-nav .atelier-nav-search .atelier-nav-icon,
+  :root.dark .atelier-nav.is-compact .atelier-nav-search .atelier-nav-icon {
+    background: var(--dark-blue);
+    color: var(--dark-canvas);
+    border-color: #a4c7ea;
+    box-shadow: 0 3px 8px #00000038;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  /* Existing translucent search/menu controls; opaque form and filter panels. */
+  :root.dark :is(.home-filter-dialog, .atelier-inventory-search, .search-spotlight-message,
+    .workspace-overlay.workspace-overlay, .workspace-admin-dialog.workspace-admin-dialog,
+    .workspace-login .login-surface) {
+    background: var(--dark-surface);
+    color: var(--dark-ink);
+    border-color: var(--dark-line);
+    box-shadow: 0 8px 24px #00000030;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  :root.dark .home-search-glass {
+    background: linear-gradient(120deg, #242424e8, #1b1b1bd9);
+    border-color: var(--dark-line);
+    box-shadow: 0 8px 24px #00000030;
+    backdrop-filter: blur(12px) saturate(1.15);
+    -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  }
+  :root.dark :is(.stock-search, .stock-options-panel) {
+    background: #242424ed;
+    border-color: var(--dark-line);
+  }
+  :root.dark :is(.home-search-glass, .stock-search):focus-within {
+    border-color: var(--dark-blue);
+    box-shadow: 0 0 0 1px var(--dark-blue);
+  }
+  :root.dark .home-filter-dialog { --home-blue: var(--dark-blue); }
+  :root.dark .home-filter-toggle,
+  :root.dark .home-filter-toggle.has-filters {
+    background: transparent;
+    border-color: var(--dark-divider);
+    color: var(--dark-muted);
+    box-shadow: none;
+  }
+  :root.dark .home-filter-toggle.has-filters { color: var(--dark-blue); }
+  :root.dark :is(.home-icon-button, .atelier-menu-button, .atelier-menu-close,
+    .stock-options[open] summary, .stock-controls .stock-options summary,
+    .settings-heading > button, .home-result-art, .category-product) {
+    background: var(--dark-raised);
+    color: var(--dark-muted);
+    border-color: var(--dark-line);
+    box-shadow: none;
+  }
+  :root.dark .stock-options[open] summary,
+  :root.dark .stock-controls .stock-options[open] summary {
+    background: var(--dark-selected);
+    color: var(--dark-blue);
+  }
+  :root.dark :is(.home-filter-chips label, .home-filter-segments,
+    .home-select-wrap select, .home-applied-filters button,
+    .home-result-notes, .home-quantity-pill, .home-event-preview,
+    .home-secondary-button) {
+    background: var(--dark-raised);
+    color: var(--dark-muted);
+    border-color: var(--dark-line);
+    box-shadow: none;
+  }
+  :root.dark :is(.home-filter-chips label.is-selected,
+    .home-filter-segments label.is-selected, .atelier-menu-link[aria-current]) {
+    background: var(--dark-selected);
+    color: var(--dark-blue);
+    border-color: #52667b;
+    box-shadow: none;
+  }
+  :root.dark .atelier-menu-link[aria-current] > svg { color: inherit; }
+  :root.dark .atelier-menu-link { color: var(--dark-ink); }
+  :root.dark .atelier-menu-link > svg { color: var(--dark-muted); }
+  :root.dark :is(.atelier-menu-heading, .atelier-menu-footer,
+    .atelier-inventory-list > div:not(.print\:block):not(:first-child)) { border-color: var(--dark-divider); }
+  :root.dark :is(.atelier-stock-content) {
+    background: var(--dark-canvas);
+    border-color: var(--dark-divider);
+  }
+  :root.dark .inventory-home .home-activity-section {
+    background: transparent;
+    border-color: var(--dark-divider);
+  }
+  :root.dark .inventory-home .home-activity-section::before {
+    background: linear-gradient(90deg, #12121200, #121212ed 12%, #121212ed 88%, #12121200);
+  }
+  :root.dark :is(.inventory-editor, .atelier-form, .editor-navigation,
+    div.editor-footer, .item-inspector, .item-inspector-actions,
+    .model-history) { background: var(--workspace-paper); color: var(--dark-ink); }
+  :root.dark .workspace-overlay { --workspace-paper: var(--dark-surface); }
+
+  /* Decorative wallpaper stays disabled. Existing modal backdrop transparency
+     remains intact, as requested; image viewing retains its original material. */
+  :root.dark .inventory-image-dialog { background: #121212f5; color: var(--dark-ink); }
+  :root.dark .inventory-image-close { background: var(--dark-raised); color: var(--dark-ink); }
+
+  /* Map legacy Tailwind surfaces onto the same opaque elevation levels.
+     These selectors also cover portal content outside the app root. */
+  :root.dark :is([class~="dark:bg-neutral-950"], [class~="bg-slate-900"]) { background: var(--dark-canvas); }
+  :root.dark :is([class*="dark:bg-neutral-900"], .app-card) { background: var(--dark-paper); border-color: var(--dark-divider); }
+  :root.dark :is([class*="dark:bg-neutral-800"], [class~="dark:bg-white/[0.05]"], .app-inner-card, .app-input) {
+    background: var(--dark-surface);
+    border-color: var(--dark-line);
+  }
+  :root.dark :is([class~="dark:bg-neutral-700"], [class~="dark:bg-neutral-600"]) { background: var(--dark-raised); }
+  :root.dark :is([class~="dark:text-white"], [class~="dark:text-slate-100"],
+    [class~="dark:text-slate-200"], .atelier-stock-content h3) { color: var(--dark-ink); }
+  :root.dark :is([class*="dark:text-slate-3"], [class*="dark:text-slate-4"],
+    [class*="dark:text-slate-5"], [class*="dark:text-slate-6"],
+    .home-stats, .home-event-heading time, .home-category small,
+    .home-event-details p, .home-event-details > small, .home-event-toggle,
+    .home-filter-group legend, .home-size-select > span:first-child,
+    .atelier-menu-group-heading h2, .atelier-menu-heading > div > span,
+    .inventory-sync-label, .search-spotlight-message p,
+    .search-spotlight-message button, .startup-content p) { color: var(--dark-muted); }
+  :root.dark :is(input, textarea)::placeholder { color: var(--dark-muted); opacity: 1; }
+  :root.dark :is(input, textarea, select, option) { color: var(--dark-ink); }
+  :root.dark option, :root.dark [role="listbox"] { background: var(--dark-raised); }
+  :root.dark :is(input[type="checkbox"], input[type="radio"]) { accent-color: var(--dark-blue); }
+  :root.dark :is(.home-item-link, .home-text-button, .activity-show-all,
+    .atelier-menu-group-heading > button, [class*="dark:text-blue-"],
+    [class*="dark:text-sky-"], [class*="dark:text-indigo-"]) { color: var(--dark-blue); }
+
+  :root.dark :is([class~="text-slate-400"], [class~="text-slate-500"], [class~="text-slate-600"]):not([class*="dark:text-"]) { color: var(--dark-muted); }
+  :root.dark :is([class~="text-slate-700"], [class~="text-slate-800"], [class~="text-slate-900"]):not([class*="dark:text-"]):not([class*="bg-white"]) { color: var(--dark-ink); }
+  :root.dark [class*="dark:bg-rose-9"] { background: #35272b; }
+  :root.dark [class*="dark:text-rose-"] { color: var(--dark-danger); }
+  :root.dark [class*="dark:bg-emerald-9"] { background: #25332e; }
+  :root.dark [class*="dark:text-emerald-"] { color: var(--dark-success); }
+  :root.dark [class*="dark:bg-amber-9"] { background: #352f25; }
+  :root.dark [class*="dark:text-amber-"] { color: var(--dark-warning); }
+  :root.dark [class*="dark:bg-violet-9"] { background: #302b39; }
+  :root.dark [class*="dark:text-violet-"] { color: #b6aacd; }
+  :root.dark [class*="dark:bg-indigo-9"] { background: #293747; }
+  :root.dark [class*="dark:text-indigo-"] { color: var(--dark-blue); }
+  :root.dark [class*="dark:bg-sky-9"] { background: #293747; }
+  :root.dark [class*="dark:text-sky-"] { color: var(--dark-blue); }
+
+  /* A light, quiet blue fill needs dark ink to retain readable contrast. */
+  :root.dark :is(.home-primary-button, .editor-footer > button[type="submit"],
+    button[data-ui="primary"], .atelier-form-footer > button[type="submit"],
+    .workspace-login form > button[type="submit"], .app-btn-primary,
+    button.bg-blue-600, button.bg-indigo-600, button.bg-blue-700,
+    button[class~="dark:bg-blue-700"], .home-filter-badge) {
+    background: var(--dark-blue);
+    color: var(--dark-canvas);
+    border-color: var(--dark-blue);
+    box-shadow: none;
+  }
+  :root.dark :is(.app-btn-secondary, .atelier-stock-content > button) {
+    background: var(--dark-raised);
+    color: var(--dark-ink);
+    border-color: var(--dark-line);
+  }
+  :root.dark .home-event:not(.home-event-rose):not(.home-event-teal):not(.home-event-amber) { --event-color: var(--dark-blue); }
+  :root.dark .home-event-rose { --event-color: var(--dark-danger); }
+  :root.dark .home-event-teal { --event-color: var(--dark-success); }
+  :root.dark .home-event-amber { --event-color: var(--dark-warning); }
+  :root.dark .home-event-node { color: var(--event-color); background: var(--dark-raised); border-color: var(--dark-divider); box-shadow: none; }
+  :root.dark .home-event::before { background: var(--dark-divider); }
+  :root.dark .home-stats .home-low-stock { color: var(--dark-warning); }
+  :root.dark .category-tone-sky { --category-dark: #8ab4e0; }
+  :root.dark .category-tone-rose { --category-dark: #ce9da8; }
+  :root.dark .category-tone-amber { --category-dark: #ccba96; }
+  :root.dark .category-tone-emerald { --category-dark: #9cbbb2; }
+  :root.dark .category-tone-violet { --category-dark: #b6aacd; }
+  :root.dark .category-tone-indigo { --category-dark: #a9b5d1; }
+  :root.dark .category-tone-fuchsia { --category-dark: #c2a8b9; }
+  :root.dark .inventory-home .home-category > .department-mark { color: var(--category-dark, var(--dark-muted)); }
+  :root.dark :focus-visible { outline-color: var(--dark-blue); }
+  :root.dark .startup-progress { background: var(--dark-divider); }
+  :root.dark .startup-progress > span { background: var(--dark-blue); }
+  :root.dark ::selection { background: var(--dark-selected); color: var(--dark-ink); }
+  @media (hover: hover) {
+    :root.dark :is(.atelier-menu-link, .stock-options-panel > button):hover { background: var(--dark-raised); }
+    :root.dark :is(button[data-ui="primary"], .home-primary-button, .editor-footer > button[type="submit"], .workspace-login form > button[type="submit"]):hover:not(:disabled) { background: #a4c7ea; }
+  }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    :root.dark .atelier-header::before,
+    :root.dark :is(.atelier-sidebar, .home-search-glass, .stock-search, .stock-options-panel),
+    :root.dark .atelier-nav .atelier-nav-glass::before {
+      background: var(--dark-surface);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    :root.dark .atelier-nav .atelier-nav-active,
+    :root.dark .atelier-nav.is-compact .atelier-nav-active {
+      background: var(--dark-selected);
+      border-color: var(--dark-line);
+      box-shadow: none;
+    }
+  }
+  @media (prefers-contrast: more) {
+    :root.dark { --dark-line: #909090; --dark-divider: #777777; --dark-muted: #c9c9c9; }
+  }
+  @media (forced-colors: active) {
+    :root.dark { --dark-canvas: Canvas; --dark-paper: Canvas; --dark-surface: Canvas; --dark-raised: ButtonFace; --dark-ink: CanvasText; --dark-muted: CanvasText; --dark-line: CanvasText; --dark-divider: CanvasText; --dark-blue: LinkText; --dark-selected: Highlight; }
+    :root.dark .atelier-nav .atelier-nav-active,
+    :root.dark .atelier-nav.is-compact .atelier-nav-active { background: Highlight; border-color: Highlight; }
+    :root.dark .atelier-nav .atelier-nav-link.is-active { color: HighlightText; }
+    :root.dark .atelier-nav .atelier-nav-search .atelier-nav-icon,
+    :root.dark .atelier-nav.is-compact .atelier-nav-search .atelier-nav-icon { background: ButtonFace; color: ButtonText; border-color: ButtonText; box-shadow: none; }
+  }
+}

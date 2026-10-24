@@ -50,6 +50,7 @@ interface TileFormProps {
   onExited?: () => void;
   onSave: (tile: any) => Promise<void>;
   editingTile: Tile | null;
+  initialValues?: Partial<Tile> | null;
   onCancel: () => void;
   onViewImage: (src: string) => void;
   activeCategoryId?: string;
@@ -63,79 +64,7 @@ interface TileFormProps {
   canManageVisibility?: boolean;
 }
 
-const PORCELAIN_PRESETS = [
-  {
-    label: '120×60 سم',
-    desc: '120*60',
-    mBox: 2.16,
-    bPallet: 44,
-  },
-  {
-    label: '60×60 سم',
-    desc: '60*60',
-    mBox: 1.8,
-    bPallet: 36,
-  },
-];
-
-const CERAMIC_PRESETS = [
-  {
-    label:
-      '60*60 - فاشون (1.46 م² - 36 كرتونة)',
-    desc:
-      '60*60 - فاشون',
-    mBox: 1.46,
-    bPallet: 36,
-  },
-  {
-    label:
-      '60*60 - بريما - قص ليزر (1.41 م² - 36 كرتونة)',
-    desc:
-      '60*60 - بريما - قص ليزر',
-    mBox: 1.41,
-    bPallet: 36,
-  },
-  {
-    label:
-      '60*60 - بريما - قص عادي (1.44 م² - 36 كرتونة)',
-    desc:
-      '60*60 - بريما - قص عادي',
-    mBox: 1.44,
-    bPallet: 36,
-  },
-  {
-    label:
-      '60*60 - 14 ملم (1.08 م² - 36 كرتونة)',
-    desc:
-      '60*60 - 14 ملم',
-    mBox: 1.08,
-    bPallet: 36,
-  },
-  {
-    label:
-      '30*60 - بريما (1.62 م² - 48 كرتونة)',
-    desc:
-      '30*60 - بريما',
-    mBox: 1.62,
-    bPallet: 48,
-  },
-  {
-    label:
-      '30*60 - فاشون (1.62 م² - 32 كرتونة)',
-    desc:
-      '30*60 - فاشون',
-    mBox: 1.62,
-    bPallet: 32,
-  },
-  {
-    label:
-      '50*50 (1.50 م² - 32 كرتونة)',
-    desc:
-      '50*50',
-    mBox: 1.5,
-    bPallet: 32,
-  },
-];
+import { PORCELAIN_PRESETS, CERAMIC_PRESETS } from '@/features/voice/voice-presets.mjs';
 
 const DEFAULT_IMAGES: Record<
   string,
@@ -172,6 +101,7 @@ const TileForm:
     onExited,
     onSave,
     editingTile,
+    initialValues,
     onCancel,
     onViewImage,
     activeCategoryId = 'tiles',
@@ -569,69 +499,78 @@ const TileForm:
         null,
       );
 
+    const voiceSeedUsed = useRef(false);
+    const voiceInitializedCategory = useRef<string | null>(null);
     useLayoutEffect(() => {
-      if (editingTile) {
+      // A transcription is an initial draft, never a source of truth after edits.
+      if (!editingTile && initialValues) {
+        if (voiceInitializedCategory.current === selectedCatId) return;
+        voiceInitializedCategory.current = selectedCatId;
+      }
+      const seed = editingTile || (!voiceSeedUsed.current && initialValues?.categoryId === selectedCatId ? initialValues : null);
+      if (seed && !editingTile) voiceSeedUsed.current = true;
+      if (seed) {
         setFormState({
           name:
-            editingTile.name ||
+            seed.name ||
             '',
 
           unitType:
-            editingTile.unitType ||
+            seed.unitType ||
             defaultUnit,
 
           quality:
-            editingTile.quality ||
-            'نخب أول',
+            seed.quality ||
+            (editingTile ? 'نخب أول' : ''),
 
           shade:
-            editingTile.shade ||
+            seed.shade ||
             '',
 
           size:
-            editingTile.size ||
+            seed.size ||
             '',
 
           surface:
-            editingTile.surface ||
-            'لامع',
+            seed.surface ||
+            (editingTile ? 'لامع' : ''),
 
           boxes:
-            editingTile.boxes ===
+            seed.boxes ===
             0
               ? ''
-              : editingTile.boxes,
+              : seed.boxes ?? '',
 
           meters:
-            editingTile.meters ===
+            seed.meters ===
             0
               ? ''
-              : editingTile.meters,
+              : seed.meters ?? '',
 
           pallets:
-            editingTile.pallets ===
+            seed.pallets ===
             0
               ? ''
-              : editingTile.pallets,
+              : seed.pallets ?? '',
 
           color:
-            editingTile.color ||
+            seed.color ||
             '',
 
           itemType:
-            editingTile.itemType ||
+            seed.itemType ||
             '',
 
           materialOrGlass:
-            editingTile.materialOrGlass ||
+            seed.materialOrGlass ||
             '',
 
           brand:
-            editingTile.brand ||
+            seed.brand ||
             '',
 
           image:
-            editingTile.image ||
+            seed.image ||
             DEFAULT_IMAGES[
               selectedCatId
             ] ||
@@ -639,19 +578,19 @@ const TileForm:
               .general,
 
           notes:
-            editingTile.notes ||
+            seed.notes ||
             '',
 
           hiddenForStaff:
-            editingTile.hiddenForStaff ||
+            seed.hiddenForStaff ||
             false,
         });
 
         if (
-          editingTile.customValues
+          seed.customValues
         ) {
           setCustomValues({
-            ...editingTile.customValues,
+            ...seed.customValues,
           });
         } else {
           const initial:
@@ -687,7 +626,7 @@ const TileForm:
             PORCELAIN_PRESETS.findIndex(
               preset =>
                 preset.desc ===
-                editingTile.size,
+                seed.size,
             );
 
           if (
@@ -717,6 +656,7 @@ const TileForm:
             setIsCustomSize(
               true,
             );
+            if (!editingTile && initialValues) { setMetersPerBox(0); setBoxesPerPallet(0); }
           }
         } else if (
           isCeramic
@@ -725,7 +665,7 @@ const TileForm:
             CERAMIC_PRESETS.findIndex(
               preset =>
                 preset.desc ===
-                editingTile.size,
+                seed.size,
             );
 
           if (
@@ -755,6 +695,7 @@ const TileForm:
             setIsCustomSize(
               true,
             );
+            if (!editingTile && initialValues) { setMetersPerBox(0); setBoxesPerPallet(0); }
           }
         }
       } else {
@@ -849,6 +790,7 @@ const TileForm:
       }
     }, [
       editingTile,
+      initialValues,
       selectedCatId,
       effectiveCategory,
       isSystem,
@@ -1900,6 +1842,8 @@ const TileForm:
       },
     ];
 
+    if (formState.quality && !qualityOptions.some(option => option.value === formState.quality)) qualityOptions.push({id:'recorded-quality',value:formState.quality,label:formState.quality});
+
     const surfaceOptions:
       AppChoiceOption[] = [
       {
@@ -1913,6 +1857,8 @@ const TileForm:
         label: 'مطفي',
       },
     ];
+
+    if (formState.surface && !surfaceOptions.some(option => option.value === formState.surface)) surfaceOptions.push({id:'recorded-surface',value:formState.surface,label:formState.surface});
 
     const presetOptions:
       AppChoiceOption[] =

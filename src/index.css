@@ -3,6 +3,8 @@
 @import "./styles/workspace.css";
 @import "./styles/refinement.css";
 @import "./styles/polish.css";
+@import "./styles/dark.css";
+@import "./styles/voice.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

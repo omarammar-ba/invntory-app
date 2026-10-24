@@ -5,8 +5,8 @@ const shownThisSession = new Set<string>();
 interface Target { x: number; y: number; width: number; height: number; radius: number; messageTop: number; messageLeft: number; messageWidth: number; messageMaxHeight: number; above: boolean; }
 
 /** A dismissible first-use spotlight. It never submits a search or opens the keyboard. */
-export default function SearchCoachmark({ searchRef, active, userId = 'local' }: {
-  searchRef: React.RefObject<HTMLInputElement>; active: boolean; userId?: string;
+export default function SearchCoachmark({ searchRef, targetRef, active, userId = 'local', storagePrefix = 'inventory-search-spotlight-v2', title = 'يمكنك البحث هنا', description = 'ابحث عن أي صنف بالاسم، الرقم، الكود أو المقاس.' }: {
+  searchRef?: React.RefObject<HTMLInputElement>; targetRef?: React.RefObject<HTMLElement>; active: boolean; userId?: string; storagePrefix?: string; title?: string; description?: string;
 }) {
   const [visible, setVisible] = useState(false);
   const [target, setTarget] = useState<Target | null>(null);
@@ -14,40 +14,41 @@ export default function SearchCoachmark({ searchRef, active, userId = 'local' }:
   const messageRef = useRef<HTMLDivElement>(null);
   const timer = useRef(0);
   const pending = useRef(false);
-  const key = `inventory-search-spotlight-v2:${userId}`;
+  const key = `${storagePrefix}:${userId}`;
   const id = useId().replace(/:/g, '');
   const remember = useCallback(() => {
     shownThisSession.add(key);
     try { localStorage.setItem(key, 'seen'); } catch { /* Session fallback remains available. */ }
   }, [key]);
   const dismiss = useCallback(() => {
-    pending.current = false; window.clearTimeout(timer.current); remember(); setVisible(false);
+    pending.current = false; window.clearTimeout(timer.current); remember(); setVisible(false); window.setTimeout(() => window.dispatchEvent(new Event('inventory-coachmark-dismissed')), 100);
   }, [remember]);
 
   useEffect(() => {
     setVisible(false); setTarget(null);
     let seen = shownThisSession.has(key);
     try { seen ||= localStorage.getItem(key) === 'seen'; } catch { /* Restricted storage. */ }
-    const input = searchRef.current;
+    const input = searchRef?.current;
     if (input === document.activeElement) { remember(); seen = true; }
     pending.current = !seen;
     const reveal = () => {
       if (document.hidden || !pending.current || document.body.style.overflow === 'hidden' || document.querySelector('dialog[open], [aria-modal="true"]')) return;
-      const field = input?.closest('.home-search-glass');
+      const field = targetRef?.current || input?.closest('.home-search-glass');
       const rect = field?.getBoundingClientRect();
       if (!rect || rect.width === 0 || rect.top < 0 || rect.bottom > window.innerHeight) return;
       pending.current = false; remember(); setVisible(true);
     };
-    if (!seen) timer.current = window.setTimeout(reveal, 700);
+    if (!seen) timer.current = window.setTimeout(reveal, storagePrefix === 'inventory-search-spotlight-v2' ? 700 : 1100);
+    window.addEventListener('inventory-coachmark-dismissed', reveal);
     input?.addEventListener('focus', dismiss);
     document.addEventListener('visibilitychange', reveal);
     window.addEventListener('scroll', reveal, { passive: true });
     return () => {
       pending.current = false; window.clearTimeout(timer.current);
       input?.removeEventListener('focus', dismiss);
-      document.removeEventListener('visibilitychange', reveal); window.removeEventListener('scroll', reveal);
+      document.removeEventListener('visibilitychange', reveal); window.removeEventListener('scroll', reveal); window.removeEventListener('inventory-coachmark-dismissed', reveal);
     };
-  }, [key, searchRef, remember, dismiss]);
+  }, [key, searchRef, targetRef, remember, dismiss, storagePrefix]);
   useEffect(() => { if (active) dismiss(); }, [active, dismiss]);
 
   useLayoutEffect(() => {
@@ -58,7 +59,7 @@ export default function SearchCoachmark({ searchRef, active, userId = 'local' }:
     document.body.style.overflow = 'hidden';
     dialog.showModal(); dialog.focus({ preventScroll: true });
     const measure = () => {
-      const field = searchRef.current?.closest('.home-search-glass');
+      const field = targetRef?.current || searchRef?.current?.closest('.home-search-glass');
       if (!field) return;
       const rect = field.getBoundingClientRect();
       const width = Math.min(340, window.innerWidth - 40);
@@ -79,7 +80,7 @@ export default function SearchCoachmark({ searchRef, active, userId = 'local' }:
       window.removeEventListener('resize', measure); window.visualViewport?.removeEventListener('resize', measure);
       dialog.close(); document.body.style.overflow = previousOverflow;
     };
-  }, [visible, searchRef]);
+  }, [visible, searchRef, targetRef]);
 
   if (!visible) return null;
   return createPortal(<dialog ref={dialogRef} className="search-spotlight" tabIndex={-1} aria-labelledby={`${id}-title`} aria-describedby={`${id}-copy`}
@@ -92,8 +93,8 @@ export default function SearchCoachmark({ searchRef, active, userId = 'local' }:
       <div className="search-spotlight-ring" aria-hidden="true" style={{ left: target.x, top: target.y, width: target.width, height: target.height, borderRadius: target.radius }} />
     </>}
     <div ref={messageRef} className={`search-spotlight-message${target?.above ? ' is-above' : ''}`} style={{ visibility: target ? 'visible' : 'hidden', top: target?.messageTop, left: target?.messageLeft, width: target?.messageWidth || 300, maxHeight: target?.messageMaxHeight }}>
-      <h2 id={`${id}-title`}>يمكنك البحث هنا</h2>
-      <p id={`${id}-copy`}>ابحث عن أي صنف بالاسم، الرقم، الكود أو المقاس.</p>
+      <h2 id={`${id}-title`}>{title}</h2>
+      <p id={`${id}-copy`}>{description}</p>
       <button type="button">المس أي مكان للمتابعة</button>
     </div>
   </dialog>, document.body);

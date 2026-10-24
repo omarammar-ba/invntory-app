@@ -12,7 +12,7 @@
       try {
         const dark = localStorage.getItem('app_theme') === 'dark';
         document.documentElement.classList.toggle('dark', dark);
-        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#080808' : '#f9fbfd');
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#121212' : '#f9fbfd');
       } catch { /* Keep the light fallback when storage is restricted. */ }
     </script>
     <meta name="mobile-web-app-capable" content="yes" />
@@ -43,7 +43,7 @@
         -webkit-text-size-adjust: 100%;
         text-size-adjust: 100%;
       }
-      html.dark { background: #0a0a0a; }
+      html.dark { background: #121212; }
       html.app-launching {
         background: #3730a3;
       }
@@ -58,7 +58,7 @@
         font-family: "Cairo", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         -webkit-tap-highlight-color: transparent;
       }
-      html.dark body { background: #0a0a0a; color: #f8fafc; }
+      html.dark body { background: #121212; color: #e6e6e6; }
       html.app-launching body { background: #3730a3; }
       #root {
         width: 100%;
@@ -301,7 +301,7 @@
       .startup-credit { position: absolute; bottom: max(28px, env(safe-area-inset-bottom)); width: 120px; height: auto; }
       @keyframes startup-stream { from { transform: translateX(-120%); } to { transform: translateX(360%); } }
       @media (prefers-reduced-motion: reduce) { .startup-progress > span { animation: none; left: 29%; transform: none; } }
-      html.dark #app-launch-splash { background: #080808; color: #f2f2f3; }
+      html.dark #app-launch-splash { background: #121212; color: #e6e6e6; }
     </style>
   </head>
   <body>

@@ -1,0 +1,1 @@
+{"name":"inventory-voice-api","private":true,"type":"module","scripts":{"dev":"wrangler dev","deploy":"wrangler deploy","test":"node --test test.mjs"},"dependencies":{"jose":"^6.1.0"},"devDependencies":{"wrangler":"^4.36.0"}}

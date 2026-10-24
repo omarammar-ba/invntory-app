@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { ChevronLeft, Ellipsis, FolderCog, List, MoveHorizontal, Plus, Printer } from 'lucide-react';
 import type { Category, Tile } from '@/types';
 import SearchFilter from './SearchFilter';
+import VoiceAddButton from '@/features/voice/VoiceAddButton';
 import SummaryCards from '@/features/dashboard/SummaryCards';
 
 interface Props {
@@ -13,13 +14,15 @@ interface Props {
   onSelectCategory: (id: string) => void;
   onShowAll: () => void;
   onAdd: () => void;
+  onVoiceAdd?: () => void;
+  userId?: string;
   onPrint: () => void;
   onManageCategories?: () => void;
   children: React.ReactNode;
 }
 
 export default function InventoryWorkspace({ categories, category, tiles, searchQuery, onSearchChange,
-  onSelectCategory, onShowAll, onAdd, onPrint, onManageCategories, children }: Props) {
+  onSelectCategory, onShowAll, onAdd, onPrint, onManageCategories, onVoiceAdd, userId, children }: Props) {
   const actionsRef = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const outside = (event: PointerEvent) => {
@@ -50,6 +53,7 @@ export default function InventoryWorkspace({ categories, category, tiles, search
         </div>
       </details>
     </div>
+    {onVoiceAdd && <div className="voice-section-entry"><VoiceAddButton onClick={onVoiceAdd} userId={userId} /></div>}
     <div className="stock-register" id="print-area" key={category.id}>{children}</div>
     <div className="stock-register-footer no-print">
       <span><MoveHorizontal size={15} strokeWidth={1.5} />اسحب الصنف لإظهار الإجراءات</span>

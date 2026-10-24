@@ -8,7 +8,9 @@ import type { Category, LogEntry, StaffMember, Tile } from '@/types';
 import { motionEase } from '@/styles/motion';
 import HomeSearchFilters from './HomeSearchFilters';
 import SearchCoachmark from './SearchCoachmark';
+import VoiceAddButton from '@/features/voice/VoiceAddButton';
 import ActivityTimeline from '@/components/ui/ActivityTimeline';
+import CategoryGlassMark from '@/components/ui/CategoryGlassMark';
 import { CategorySymbol, categoryTone } from '@/components/ui/CategorySymbol';
 import ImageModal from '@/features/inventory/ImageModal';
 import ItemDetailsSheet, { type ItemSelection } from '@/components/ui/ItemDetailsSheet';
@@ -29,6 +31,7 @@ interface DashboardProps {
   onOpenReservation?: (tile: Tile) => void;
   onEditTile?: (tile: Tile) => void;
   onViewModelLogs?: (name: string) => void;
+  onVoiceAdd?: () => void;
   onSearchActiveChange?: (active: boolean) => void;
 }
 
@@ -38,7 +41,7 @@ const quantity = (tile: Tile) => Number.isFinite(Number(tile.meters)) ? Number(t
 export default function Dashboard({
   allTiles = [], logs = [], categories = [], currentStaff, isSyncing = false,
   searchInputRef, onSelectCategory, onNavigate, onOpenReservation,
-  onEditTile, onViewModelLogs, onSearchActiveChange,
+  onEditTile, onViewModelLogs, onSearchActiveChange, onVoiceAdd,
 }: DashboardProps) {
   const [search, setSearch] = useState('');
   const [inspecting, setInspecting] = useState<ItemSelection | null>(null);
@@ -110,6 +113,7 @@ export default function Dashboard({
   return <div className="inventory-home" dir="rtl">
     <motion.div className="home-welcome" {...enter(0)}>
       <h2>مرحباً، <strong>{currentStaff?.name || 'المستخدم'}</strong></h2>
+      {onVoiceAdd && <VoiceAddButton onClick={onVoiceAdd} userId={currentStaff?.id} />}
     </motion.div>
 
     <motion.section className="home-search-section" aria-label="البحث في المخزون" {...enter(0.04)}>
@@ -194,7 +198,7 @@ export default function Dashboard({
           const summary = stats.byCategory.get(category.id);
           const defaultPieces = category.defaultUnit === 'pieces';
           return <div role="listitem" key={category.id} style={{ '--department-order': Math.min(index, 3) } as React.CSSProperties}><button type="button" className={`home-category department-choice ${categoryTone(category)}`} onClick={() => onSelectCategory(category.id)}>
-            <span className="department-mark" aria-hidden="true"><CategorySymbol category={category} size={30} /><ChevronLeft size={13} className="department-direction" /></span>
+            <span className="department-mark" aria-hidden="true"><CategoryGlassMark category={category} /><ChevronLeft size={13} className="department-direction" /></span>
             <strong>{category.name}</strong><span className="category-caption"><bdi>{summary?.count || 0}</bdi> صنف</span>
             <small>{summary && summary.meters > 0 && <><bdi>{number(summary.meters)}</bdi> م²</>}{summary && summary.meters > 0 && summary.pieces > 0 && ' + '}{summary && summary.pieces > 0 && <><bdi>{number(summary.pieces)}</bdi> قطعة</>}{(!summary || (!summary.meters && !summary.pieces)) && <>0 {defaultPieces ? 'قطعة' : 'م²'}</>}</small>
           </button></div>;

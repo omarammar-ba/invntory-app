@@ -1,0 +1,13 @@
+{
+  "name": "inventory-voice-api",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-24",
+  "vars": {
+    "ALLOWED_ORIGINS": "https://YOUR-WEBSITE.example",
+    "FIREBASE_PROJECT_ID": "YOUR_FIREBASE_PROJECT_ID"
+  },
+  "ratelimits": [
+    { "name": "USER_LIMIT", "namespace_id": "19001", "simple": { "limit": 4, "period": 60 } },
+    { "name": "GLOBAL_LIMIT", "namespace_id": "19002", "simple": { "limit": 15, "period": 60 } }
+  ]
+}

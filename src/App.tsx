@@ -12,6 +12,7 @@ import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import BottomNav from "@/components/layout/BottomNav";
 import InventoryWorkspace from "@/features/inventory/InventoryWorkspace";
+const VoiceAddModal = React.lazy(() => import('@/features/voice/VoiceAddModal'));
 import StartupScreen from "@/components/ui/StartupScreen";
 import { orderHomeCategories } from '@/features/dashboard/dashboardModel';
 import {
@@ -484,9 +485,15 @@ const App: React.FC = () => {
   >(null);
 
 
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voiceCategoryId, setVoiceCategoryId] = useState<string | null>(null);
+  const [voiceValues, setVoiceValues] = useState<Partial<Tile> | null>(null);
+
   const clearSecuritySensitiveState =
     useCallback(
       () => {
+        setVoiceOpen(false);
+        setVoiceValues(null);
         setInitialInventoryReady(false);
         setStartupWaitExpired(false);
         setPorcelainTiles([]);
@@ -504,7 +511,7 @@ const App: React.FC = () => {
 
 
   useEffect(() => {
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isDarkMode ? '#080808' : '#f9fbfd');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isDarkMode ? '#121212' : '#f9fbfd');
   }, [isDarkMode]);
 
   // Decorative CSS layers pause off-screen; inventory subscriptions stay unchanged.
@@ -819,7 +826,7 @@ const App: React.FC = () => {
       if (!visibleCategoryIds.has(activeCategoryId)) {
         const firstAvailable = Array.from(visibleCategoryIds)[0] ?? null;
         setEditingTile(null);
-        setIsAddingNew(false);
+        setIsAddingNew(false); setVoiceValues(null);
         setView('dashboard');
         setActiveCategoryId(firstAvailable);
       }
@@ -1709,6 +1716,7 @@ const App: React.FC = () => {
       (
         tile: Tile
       ) => {
+        setVoiceValues(null);
         setEditingTile(
           tile
         );
@@ -2598,6 +2606,7 @@ const App: React.FC = () => {
           setIsAddingNew(
             false
           );
+          setVoiceValues(null);
 
         } catch (error) {
           console.error(
@@ -2648,6 +2657,8 @@ const App: React.FC = () => {
         setIsAddingNew(
           false
         );
+        setVoiceValues(null);
+        setVoiceOpen(false);
 
         // Opening the general audit-log page from navigation must never keep a
         // model-specific filter from an earlier visit. Item-specific log viewing
@@ -3112,6 +3123,7 @@ const App: React.FC = () => {
                     }
                     searchInputRef={homeSearchInputRef}
                     onSearchActiveChange={setIsHomeSearching}
+                    onVoiceAdd={() => { setVoiceCategoryId(null); setVoiceOpen(true); }}
                     onEditTile={handleEditClick}
                     onViewModelLogs={handleViewModelLogs}
                     onSelectCategory={
@@ -3119,6 +3131,7 @@ const App: React.FC = () => {
                         setIsAddingNew(
                           false
                         );
+                        setVoiceValues(null);
 
                         handleCategoryChange(
                           catId
@@ -3149,7 +3162,9 @@ const App: React.FC = () => {
                     onSelectCategory={handleCategoryChange}
                     onShowAll={() => setIsFullListModalOpen(true)}
                     onPrint={openPrintReport}
-                    onAdd={() => { setAddItemSource('category'); setIsAddingNew(true); }}
+                    userId={currentStaff?.id}
+                    onVoiceAdd={() => { setVoiceCategoryId(activeCategoryId); setVoiceOpen(true); }}
+                    onAdd={() => { setVoiceValues(null); setAddItemSource('category'); setIsAddingNew(true); }}
                     onManageCategories={isEmployee ? undefined : () => {
                       setEditingCategoryModalId(null); setIsCategoryModalOpen(true);
                     }}
@@ -3362,6 +3377,11 @@ const App: React.FC = () => {
         </ElasticScroll>
       </div>
 
+      {voiceOpen && <React.Suspense fallback={<div role="status" className="voice-loading">جارٍ فتح التسجيل…</div>}><VoiceAddModal userId={currentStaff?.id} key={currentStaff?.id} categories={categories.filter(c => !isEmployee || c.visibleToEmployees === true)} categoryId={voiceCategoryId} onClose={() => setVoiceOpen(false)} onContinue={(values, categoryId) => {
+        const category = categories.find(c => c.id === categoryId);
+        if (!category || !currentStaff || currentStaff.status !== 'active' || (isEmployee && category.visibleToEmployees !== true)) { setVoiceOpen(false); return; }
+        setVoiceOpen(false); setEditingTile(null); setVoiceValues(values); setGlobalAddCategoryId(categoryId); setActiveCategoryId(categoryId); setAddItemSource('global'); setIsTileFormClosing(false); setIsAddingNew(true);
+      }} /></React.Suspense>}
       {(isAddingNew || editingTile) && (
         <TileForm
           open={!isTileFormClosing}
@@ -3369,9 +3389,11 @@ const App: React.FC = () => {
             setEditingTile(null);
             setIsAddingNew(false);
             setIsTileFormClosing(false);
+            setVoiceValues(null);
           }}
           onSave={handleSaveTile}
           editingTile={editingTile}
+          initialValues={voiceValues}
           onCancel={() => setIsTileFormClosing(true)}
           onViewImage={setViewingImage}
           activeCategoryId={!editingTile && addItemSource === 'global' ? globalAddCategoryId || activeCategoryId || undefined : activeCategoryId || undefined}
@@ -3410,12 +3432,14 @@ const App: React.FC = () => {
           setIsAddingNew(
             false
           );
+          setVoiceValues(null);
 
           changeView(
             'dashboard'
           );
         }}
         onAdd={() => {
+          setVoiceValues(null);
           setGlobalAddCategoryId(orderHomeCategories(categories.filter(category => !isEmployee || category.visibleToEmployees === true))[0]?.id || activeCategoryId);
           setAddItemSource(
             'global'
@@ -3433,6 +3457,7 @@ const App: React.FC = () => {
           setIsAddingNew(
             false
           );
+          setVoiceValues(null);
 
           changeView(
             'inventory'
@@ -3442,6 +3467,7 @@ const App: React.FC = () => {
           setIsAddingNew(
             false
           );
+          setVoiceValues(null);
 
           changeView(
             'logs'
