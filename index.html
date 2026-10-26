@@ -311,5 +311,24 @@
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script id="development-cache-cleanup">
+// Old PWA caches must not serve stable Vite module URLs during development.
+if ('serviceWorker' in navigator && document.querySelector('script[type="module"][src="/src/main.tsx"]')) {
+  void (async () => {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    const own = registrations.filter(registration => {
+      const script = registration.active?.scriptURL || registration.waiting?.scriptURL || registration.installing?.scriptURL;
+      return script && new URL(script).origin === location.origin && new URL(script).pathname === '/sw.js';
+    });
+    const controlled = own.some(registration => registration.active?.scriptURL === navigator.serviceWorker.controller?.scriptURL);
+    await Promise.all(own.map(registration => registration.unregister()));
+    if (own.length && 'caches' in window) {
+      const names = await caches.keys();
+      await Promise.all(names.filter(name => name.startsWith('inventory-app-')).map(name => caches.delete(name)));
+    }
+    if (controlled) location.reload();
+  })().catch(error => console.warn('Development cache cleanup failed:', error));
+}
+    </script>
   </body>
 </html>

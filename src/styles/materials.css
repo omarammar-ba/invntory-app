@@ -1,0 +1,135 @@
+/* One restrained glass material for existing chrome; stock rows and text stay clear. */
+:root {
+  --material-edge: #ffffffb8;
+  --material-fill: linear-gradient(145deg, #ffffffc9, #f5f9ffad);
+  --material-shadow: 0 7px 24px #20375012, inset 0 1px 0 #fff9;
+}
+:root.dark {
+  --material-edge: #ffffff2e;
+  --material-fill: linear-gradient(145deg, #3a3c408f, #24262ab8);
+  --material-shadow: 0 9px 26px #0003, inset 0 1px 0 #ffffff16;
+}
+:is(
+  .home-search-glass,
+  .stock-search,
+  .stock-options-panel,
+  .atelier-sidebar,
+  .home-filter-dialog,
+  .workspace-overlay.workspace-overlay,
+  .workspace-admin-dialog.workspace-admin-dialog,
+  .workspace-login .login-surface
+) {
+  border-color: var(--material-edge);
+  box-shadow: var(--material-shadow);
+  background: var(--material-fill);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+}
+:root.dark
+  :is(
+    .home-search-glass,
+    .stock-search,
+    .stock-options-panel,
+    .atelier-sidebar,
+    .home-filter-dialog,
+    .workspace-overlay.workspace-overlay,
+    .workspace-admin-dialog.workspace-admin-dialog,
+    .workspace-login .login-surface
+  ) {
+  border-color: var(--material-edge);
+  box-shadow: var(--material-shadow);
+  background: var(--material-fill);
+  backdrop-filter: blur(16px) saturate(1.04);
+  -webkit-backdrop-filter: blur(16px) saturate(1.04);
+}
+/* Shared glass for existing controls; dock geometry and icon anchors are unchanged. */
+:is(.atelier-menu-button, .home-icon-button, .atelier-menu-close, .stock-controls .stock-options summary, .workspace-overlay-close, .home-event-toggle),
+:root.dark :is(.atelier-menu-button, .home-icon-button, .atelier-menu-close, .stock-controls .stock-options summary, .workspace-overlay-close, .home-event-toggle),
+.atelier-nav .atelier-nav-glass::before,
+:root.dark .atelier-nav .atelier-nav-glass::before {
+  background: var(--material-fill);
+  border: 1px solid var(--material-edge);
+  box-shadow: var(--material-shadow);
+  backdrop-filter: blur(20px) saturate(1.12);
+  -webkit-backdrop-filter: blur(20px) saturate(1.12);
+}
+.atelier-nav .atelier-nav-glass::before,
+:root.dark .atelier-nav .atelier-nav-glass::before {
+  backdrop-filter: blur(30px) saturate(1.12);
+  -webkit-backdrop-filter: blur(30px) saturate(1.12);
+}
+.home-event .home-event-node,
+:root.dark .home-event .home-event-node {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--event-color) 16%, transparent), color-mix(in srgb, var(--event-color) 7%, transparent));
+  border-color: var(--material-edge);
+  box-shadow: var(--material-shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.voice-entry .voice-add-button.specular-button {
+  background: var(--material-fill);
+  border: 1px solid var(--material-edge);
+  box-shadow: var(--material-shadow);
+}
+/* While recording the content has a solid substrate for stable text and inexpensive effects. */
+.workspace-overlay.workspace-overlay:has(.voice-immersive-content),
+:root.dark .workspace-overlay.workspace-overlay:has(.voice-immersive-content) {
+  background: var(--workspace-paper);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.home-search-glass.home-search-glass:focus-within,
+.stock-search.stock-search:focus-within,
+:root.dark .home-search-glass.home-search-glass:focus-within,
+:root.dark .stock-search.stock-search:focus-within {
+  border-color: var(--workspace-blue);
+  box-shadow:
+    var(--material-shadow),
+    0 0 0 1px var(--workspace-blue);
+}
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  :is(
+    .home-search-glass,
+    .stock-search,
+    .stock-options-panel,
+    .atelier-sidebar,
+    .home-filter-dialog,
+    .workspace-overlay.workspace-overlay,
+    .workspace-admin-dialog.workspace-admin-dialog,
+    .workspace-login .login-surface
+  ),
+  :root.dark
+    :is(
+      .home-search-glass,
+      .stock-search,
+      .stock-options-panel,
+      .atelier-sidebar,
+      .home-filter-dialog,
+      .workspace-overlay.workspace-overlay,
+      .workspace-admin-dialog.workspace-admin-dialog,
+      .workspace-login .login-surface
+    ) {
+    background: var(--workspace-paper);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-color: var(--workspace-line);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  :root, :root.dark { --material-fill: var(--workspace-paper); }
+  :is(.atelier-menu-button, .home-icon-button, .atelier-menu-close, .stock-controls .stock-options summary, .workspace-overlay-close, .home-event-toggle, .home-event .home-event-node),
+  :root.dark :is(.atelier-menu-button, .home-icon-button, .atelier-menu-close, .stock-controls .stock-options summary, .workspace-overlay-close, .home-event-toggle, .home-event .home-event-node),
+  .atelier-nav .atelier-nav-glass::before,
+  :root.dark .atelier-nav .atelier-nav-glass::before {
+    background: var(--workspace-paper);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+    border-color: var(--workspace-line);
+  }
+}
+@media (forced-colors: active) {
+  :root, :root.dark { --material-fill: Canvas; --material-edge: CanvasText; }
+}

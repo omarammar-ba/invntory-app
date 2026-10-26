@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'inventory-app-v15-refined-interactions';
+const CACHE_VERSION = 'inventory-app-v25-consistent-modules';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {
@@ -15,7 +15,7 @@ self.addEventListener('activate', event => {
       .then(keys =>
         Promise.all(
           keys
-            .filter(key => key !== CACHE_VERSION)
+            .filter(key => key.startsWith('inventory-app-') && key !== CACHE_VERSION)
             .map(key => caches.delete(key)),
         ),
       )
@@ -30,6 +30,9 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  // Vite modules have stable URLs but changing exports. Never cache them.
+  if (/^\/(src|@vite|@react-refresh|@id|@fs|node_modules)(\/|$)/.test(url.pathname)) return;
 
   if (request.mode === 'navigate') {
     event.respondWith(
@@ -64,7 +67,9 @@ self.addEventListener('fetch', event => {
         })
         .catch(() => cached);
 
-      return cached || network;
+      // Only content-hashed build assets are immutable; stable URLs use fresh bytes.
+      const immutable = /^\/assets\/.+-[A-Za-z0-9_-]{8,}\.(?:js|css)$/.test(url.pathname);
+      return immutable && cached ? cached : network;
     }),
   );
 });

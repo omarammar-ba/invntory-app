@@ -5,6 +5,7 @@
 @import "./styles/polish.css";
 @import "./styles/dark.css";
 @import "./styles/voice.css";
+@import "./styles/materials.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

@@ -20,6 +20,7 @@
     "motion": "^13.1.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "thinking-orbs": "^0.3.2",
     "voice-glow": "^0.3.0"
   },
   "devDependencies": {
