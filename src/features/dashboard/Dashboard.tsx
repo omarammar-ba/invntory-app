@@ -20,9 +20,7 @@ import {
   X,
 } from "lucide-react";
 import type { Category, LogEntry, StaffMember, Tile } from "@/types";
-import { motionEase } from "@/styles/motion";
 import HomeSearchFilters from "./HomeSearchFilters";
-import SearchCoachmark from "./SearchCoachmark";
 import VoiceAddButton from "@/features/voice/VoiceAddButton";
 import ActivityTimeline from "@/components/ui/ActivityTimeline";
 import CategoryGlassMark from "@/components/ui/CategoryGlassMark";
@@ -47,6 +45,7 @@ interface DashboardProps {
   categories?: Category[];
   currentStaff?: StaffMember | null;
   isSyncing?: boolean;
+  inventoryHydrated?: boolean;
   searchInputRef?: React.RefObject<HTMLInputElement>;
   onSelectCategory: (categoryId: string) => void;
   onNavigate: (tab: string) => void;
@@ -68,6 +67,7 @@ export default function Dashboard({
   categories = [],
   currentStaff,
   isSyncing = false,
+  inventoryHydrated = true,
   searchInputRef,
   onSelectCategory,
   onNavigate,
@@ -116,6 +116,7 @@ export default function Dashboard({
   );
   const filterCount = activeFilterCount(filters);
   const searching = Boolean(search.trim() || filterCount);
+  const stockNumber = (value: number, digits = 2) => inventoryHydrated ? number(value, digits) : '—';
 
   useEffect(() => {
     onSearchActiveChange?.(searching);
@@ -186,14 +187,6 @@ export default function Dashboard({
     [logs],
   );
 
-  const enter = (delay: number) =>
-    reduceMotion
-      ? {}
-      : {
-          initial: { opacity: 0.35, y: 6 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.26, delay: delay * 0.4, ease: motionEase },
-        };
   const clearSearch = () => {
     setSearch("");
     setFilters({ ...EMPTY_HOME_FILTERS });
@@ -202,22 +195,17 @@ export default function Dashboard({
 
   return (
     <div className="inventory-home" dir="rtl">
-      <motion.div className="home-welcome" {...enter(0)}>
+      <div className="home-welcome">
         <h2>
           مرحباً، <strong>{currentStaff?.name || "المستخدم"}</strong>
         </h2>
-      </motion.div>
+      </div>
 
-      <motion.section
+      <section
         className="home-search-section"
         aria-label="البحث في المخزون"
-        {...enter(0.04)}
+       
       >
-        <SearchCoachmark
-          searchRef={searchRef}
-          active={searching || filterOpen}
-          userId={currentStaff?.id}
-        />
         <form
           role="search"
           className="home-search-glass"
@@ -315,7 +303,7 @@ export default function Dashboard({
             </p>
           )}
         </div>
-      </motion.section>
+      </section>
 
       {searching ? (
         <section
@@ -571,39 +559,40 @@ export default function Dashboard({
         </section>
       ) : (
         <>
-          <motion.div className="home-stats" {...enter(0.08)}>
+          <div className="home-stats">
             <span>
-              <bdi>{number(items.length, 0)}</bdi> صنف
+              <bdi>{stockNumber(items.length, 0)}</bdi> صنف
             </span>
             <i />
             <span>
               {stats.meters > 0 || stats.pieces === 0 ? (
                 <>
-                  <bdi>{number(stats.meters)}</bdi> م²
+                  <bdi>{stockNumber(stats.meters)}</bdi> م²
                 </>
               ) : null}
               {stats.meters > 0 && stats.pieces > 0 && " + "}
               {stats.pieces > 0 && (
                 <>
-                  <bdi>{number(stats.pieces)}</bdi> قطعة
+                  <bdi>{stockNumber(stats.pieces)}</bdi> قطعة
                 </>
               )}
             </span>
             <i />
             <span>
-              <bdi>{number(stats.reservations, 0)}</bdi> حجز
+              <bdi>{stockNumber(stats.reservations, 0)}</bdi> حجز
             </span>
             <i />
             <span className={stats.lowStock ? "home-low-stock" : ""}>
-              <bdi>{number(stats.lowStock, 0)}</bdi> منخفض
+              <bdi>{stockNumber(stats.lowStock, 0)}</bdi> منخفض
             </span>
-          </motion.div>
-          <motion.section className="home-categories-section" {...enter(0.15)}>
+          </div>
+          <section className="home-categories-section">
             <div className="home-section-heading home-departments-heading">
               <h2>الأقسام</h2>
               {onVoiceAdd && (
                 <VoiceAddButton
                   compact
+                  showCoachmark={false}
                   onClick={onVoiceAdd}
                   userId={currentStaff?.id}
                 />
@@ -650,12 +639,12 @@ export default function Dashboard({
                         </span>
                         <strong>{category.name}</strong>
                         <span className="category-caption">
-                          <bdi>{summary?.count || 0}</bdi> صنف
+                          <bdi>{stockNumber(summary?.count ?? 0, 0)}</bdi> صنف
                         </span>
                         <small>
                           {summary && summary.meters > 0 && (
                             <>
-                              <bdi>{number(summary.meters)}</bdi> م²
+                              <bdi>{stockNumber(summary.meters)}</bdi> م²
                             </>
                           )}
                           {summary &&
@@ -664,12 +653,12 @@ export default function Dashboard({
                             " + "}
                           {summary && summary.pieces > 0 && (
                             <>
-                              <bdi>{number(summary.pieces)}</bdi> قطعة
+                              <bdi>{stockNumber(summary.pieces)}</bdi> قطعة
                             </>
                           )}
                           {(!summary ||
                             (!summary.meters && !summary.pieces)) && (
-                            <>0 {defaultPieces ? "قطعة" : "م²"}</>
+                            <><bdi>{stockNumber(0)}</bdi> {defaultPieces ? "قطعة" : "م²"}</>
                           )}
                         </small>
                       </button>
@@ -677,11 +666,15 @@ export default function Dashboard({
                   );
                 })}
               </div>
+            ) : isSyncing ? (
+              <div className="home-categories-rail home-category-placeholders" aria-hidden="true">
+                <div /><div /><div />
+              </div>
             ) : (
               <p className="home-empty">لا توجد أقسام متاحة لهذا الحساب.</p>
             )}
-          </motion.section>
-          <motion.section className="home-activity-section" {...enter(0.28)}>
+          </section>
+          <section className="home-activity-section">
             <div className="home-section-heading">
               <div>
                 <h2>آخر الحركات</h2>
@@ -709,7 +702,7 @@ export default function Dashboard({
                 <p>ستظهر عمليات الإضافة والتعديل والحجز هنا.</p>
               </div>
             )}
-          </motion.section>
+          </section>
         </>
       )}
       <ItemDetailsSheet

@@ -295,6 +295,26 @@ html[data-ui-paused] .home-search-glass::after { animation-play-state: paused; }
 
 /* The requested dark appearance is a plain black canvas. */
 .dark .atelier-app::before, .dark .atelier-app::after, .dark .atelier-app[data-view="logs"]::before { display: none; animation: none; background: none; }
+
+/* Keep the first frame readable while navigation and inventory sync settle. */
+.atelier-app:is([data-view="dashboard"], [data-view="warehouse"])::before,
+.atelier-app:is([data-view="dashboard"], [data-view="warehouse"]) .atelier-view,
+.atelier-app[data-view="dashboard"] .home-category,
+.atelier-app[data-view="dashboard"] .home-search-glass::after,
+.atelier-app[data-view="warehouse"] :is(.stock-controls, .stock-register, .atelier-stock-row) {
+  animation: none;
+}
+
+.inventory-home .home-category-placeholders > div { min-height: 138px; }
+.inventory-home .home-category-placeholders > div::after {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 32px;
+  margin: 18px 12px;
+  border-radius: 9px;
+  background: var(--workspace-line);
+}
 @media (prefers-contrast: more) {
  .atelier-nav .atelier-nav-glass::before { border-color: #6b83a1; }
  .dark .atelier-nav .atelier-nav-glass::before { border-color: #999; }

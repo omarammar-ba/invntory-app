@@ -40,6 +40,7 @@ import { formatAuditDate } from './auditDate';
 
 interface FullListModalProps {
   isOpen: boolean;
+  mobileSnap?: React.ComponentProps<typeof ResponsiveOverlay>['mobileSnap'];
   onClose: () => void;
   category: Category;
   tiles: Tile[];
@@ -93,6 +94,7 @@ export const FullListModal:
     FullListModalProps
   > = ({
     isOpen,
+    mobileSnap = 'expanded',
     onClose,
     category,
     tiles,
@@ -207,7 +209,7 @@ export const FullListModal:
         open={isOpen}
         onClose={onClose}
         title={`المخزون الكامل - ${category.name}`}
-        mobileSnap="expanded"
+        mobileSnap={mobileSnap}
         desktopMaxWidth="max-w-5xl"
         contentClassName="atelier-full-list app-readable p-0"
       >

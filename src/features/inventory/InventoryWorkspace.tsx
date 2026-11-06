@@ -25,6 +25,10 @@ interface Props {
   userId?: string;
   onPrint: () => void;
   onManageCategories?: () => void;
+  showSummary?: boolean;
+  actionsDisabled?: boolean;
+  searchResetKey?: number;
+  separatePrint?: boolean;
   children: React.ReactNode;
 }
 
@@ -41,6 +45,10 @@ export default function InventoryWorkspace({
   onManageCategories,
   onVoiceAdd,
   userId,
+  showSummary = true,
+  actionsDisabled = false,
+  searchResetKey,
+  separatePrint = false,
   children,
 }: Props) {
   const actionsRef = useRef<HTMLDetailsElement>(null);
@@ -64,22 +72,32 @@ export default function InventoryWorkspace({
       dir="rtl"
       aria-label={`مخزون ${category.name}`}
     >
-      <div className="stock-summary">
+      {showSummary && <div className="stock-summary">
         <SummaryCards
           tiles={tiles}
           activeCategoryId={category.id}
           unitType={category.defaultUnit}
         />
-      </div>
+      </div>}
       <div className="stock-controls no-print">
         <SearchFilter
+          key={searchResetKey}
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
         />
         {onVoiceAdd && (
           <VoiceAddButton compact onClick={onVoiceAdd} userId={userId} />
         )}
-        <details
+        {separatePrint ? <>
+          <button type="button" className="stock-add-button" aria-label="إضافة صنف لهذا القسم"
+            title="إضافة صنف لهذا القسم" disabled={actionsDisabled} onClick={onAdd}>
+            <Plus size={23} strokeWidth={1.7} aria-hidden="true" />
+          </button>
+          <button type="button" className="stock-print-button" aria-label="طباعة وتصدير"
+            title="طباعة وتصدير" disabled={actionsDisabled} onClick={onPrint}>
+            <Printer size={20} strokeWidth={1.7} aria-hidden="true" />
+          </button>
+        </> : <details
           ref={actionsRef}
           className="stock-options"
           onKeyDown={(event) => {
@@ -94,15 +112,15 @@ export default function InventoryWorkspace({
             <Plus size={23} strokeWidth={1.7} />
           </summary>
           <div className="stock-options-panel" aria-label="إجراءات القسم">
-            <button type="button" onClick={() => run(onAdd)}>
+            <button type="button" disabled={actionsDisabled} onClick={() => run(onAdd)}>
               <Plus size={18} />
               إضافة صنف لهذا القسم
             </button>
-            <button type="button" onClick={() => run(onShowAll)}>
+            <button type="button" disabled={actionsDisabled} onClick={() => run(onShowAll)}>
               <List size={18} />
               عرض المخزون الكامل
             </button>
-            <button type="button" onClick={() => run(onPrint)}>
+            <button type="button" disabled={actionsDisabled} onClick={() => run(onPrint)}>
               <Printer size={18} />
               طباعة وتصدير
             </button>
@@ -113,7 +131,7 @@ export default function InventoryWorkspace({
               </button>
             )}
           </div>
-        </details>
+        </details>}
       </div>
       <div className="stock-register" id="print-area" key={category.id}>
         {children}
@@ -123,7 +141,7 @@ export default function InventoryWorkspace({
           <MoveHorizontal size={15} strokeWidth={1.5} />
           اسحب الصنف لإظهار الإجراءات
         </span>
-        <button type="button" onClick={onShowAll}>
+        <button type="button" disabled={actionsDisabled} onClick={onShowAll}>
           عرض الكل
           <ChevronLeft size={15} />
         </button>

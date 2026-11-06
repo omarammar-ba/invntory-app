@@ -25,7 +25,6 @@
 
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="preload" as="image" href="/icons/icon-192.png" />
-    <link rel="preload" as="image" href="/branding/dollarix-studio-color.png" />
     <link rel="preload" as="font" type="font/woff2" href="/fonts/cairo-arabic-wght-normal.woff2" crossorigin />
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
@@ -302,12 +301,13 @@
       @keyframes startup-stream { from { transform: translateX(-120%); } to { transform: translateX(360%); } }
       @media (prefers-reduced-motion: reduce) { .startup-progress > span { animation: none; left: 29%; transform: none; } }
       html.dark #app-launch-splash { background: #121212; color: #e6e6e6; }
+      html:not(.app-launching) #app-launch-splash { display: none; }
     </style>
   </head>
   <body>
     <div id="app-launch-splash" role="status" aria-live="polite" aria-label="جارٍ تشغيل إدارة مخزون">
       <div class="startup-content"><img src="/icons/icon-192.png" width="84" height="84" alt="" /><h1>إدارة مخزون</h1><p id="app-launch-status">جارٍ تشغيل التطبيق…</p><span class="startup-progress" aria-hidden="true"><span></span></span></div>
-      <img class="startup-credit" src="/branding/dollarix-studio-color.png" alt="Dollarix Studio" width="975" height="283" />
+      <img class="startup-credit" src="/branding/dollarix-studio-color.png" alt="Dollarix Studio" width="975" height="283" fetchpriority="low" />
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

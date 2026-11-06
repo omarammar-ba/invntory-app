@@ -5,15 +5,17 @@ import { useAppAppearance } from "@/features/voice/useAppAppearance";
 const Glass = GlassIcons as React.ComponentType<any>;
 export default function CategoryGlassMark({
   category,
+  compact = false,
 }: {
   category: Category;
+  compact?: boolean;
 }) {
   const { dark, limited } = useAppAppearance();
   const color =
     (
       {
         tiles: "blue",
-        ceramics: "purple",
+        ceramics: compact ? "green" : "purple",
         seats: "indigo",
         sinks: "orange",
         shower_box: "teal",
@@ -32,7 +34,7 @@ export default function CategoryGlassMark({
             color,
           },
         ]}
-        size={46}
+        size={compact ? 42 : 46}
         gap={0}
         columns={1}
         roundness={0.6}
@@ -47,9 +49,9 @@ export default function CategoryGlassMark({
         tilt={16}
         spread={0.5}
         hover="press"
-        parallax={0.25}
+        parallax={compact ? 0 : 0.25}
         labels="none"
-        intro={true}
+        intro={false}
         theme={dark ? "dark" : "light"}
       />
     </span>

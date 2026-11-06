@@ -307,6 +307,34 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /warehouses/al-naimi/options/{categoryId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isAdmin()
+        && (categoryId == 'tiles' || categoryId == 'ceramics');
+    }
+
+    match /warehouses/al-naimi/stock/{itemId} {
+      allow get, list, delete: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.id == itemId
+        && (request.resource.data.categoryId == 'tiles' || request.resource.data.categoryId == 'ceramics')
+        && validCreateAudit(request.resource.data);
+      allow update: if isAdmin()
+        && request.resource.data.id == itemId
+        && request.resource.data.categoryId == resource.data.categoryId
+        && validUpdateAudit(request.resource.data)
+        && preservesCreationAudit();
+    }
+
+    match /warehouses/al-naimi/logs/{logId} {
+      allow get, list: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.user == staffData().name
+        && request.resource.data.timestamp == request.time
+        && (request.resource.data.categoryId == 'tiles' || request.resource.data.categoryId == 'ceramics');
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

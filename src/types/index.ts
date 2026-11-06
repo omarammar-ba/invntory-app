@@ -35,6 +35,9 @@ export interface CustomCategoryField {
 
 export type UnitType = 'meters' | 'pieces';
 
+export type TileQuality = 'نخب أول' | 'نخب ثاني';
+export type PackingOption = { label: string; desc: string; mBox: number; bPallet: number; quality?: TileQuality };
+
 export type CategoryTheme = 'sky' | 'rose' | 'emerald' | 'amber' | 'violet' | 'indigo' | 'fuchsia';
 
 export type CategoryTemplate = 'porcelain' | 'ceramic' | 'shower_box' | 'mixers' | 'sanitary' | 'general';
@@ -89,6 +92,7 @@ export interface Tile {
   quality?: string; // 'نخب أول' | 'نخب ثاني' | 'درجة أولى' | etc.
   shade?: string; // كود الشيد أو الموديل
   size?: string; // المقاس / الأبعاد (مثل 120*60, 90*90, 80*120)
+  packing?: { mBox: number; bPallet: number };
   surface?: string; // السطح (لامع / مطفي / ستانلس / كروم / سيكوريت)
   
   // Quantity metrics

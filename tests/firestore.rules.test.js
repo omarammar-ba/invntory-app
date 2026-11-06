@@ -565,3 +565,50 @@ test('admin may create a hidden-item audit log while employees cannot', async ()
     }),
   );
 });
+
+test('Naimeh stock, options and logs are accessible only to active admins', async () => {
+  const root = 'warehouses/al-naimi';
+  const admin = testEnv.authenticatedContext('admin-1').firestore();
+  const itemPath = root + '/stock/legacy-tile';
+  const optionPath = root + '/options/tiles';
+  const logPath = root + '/logs/warehouse-log';
+  const stock = {
+    id: 'legacy-tile', categoryId: 'tiles', name: 'صنف المستودع', meters: 7,
+    createdBy: 'عمر', createdByUid: 'admin-1', createdAt: serverTimestamp(),
+  };
+  const options = { sizes: [{ desc: '25*50', label: '25×50', mBox: 1.5, bPallet: 40 }], colors: ['رمادي'], disabledSizes: [] };
+  const log = { actorUid: 'admin-1', user: 'عمر', timestamp: serverTimestamp(), categoryId: 'tiles', action: 'إضافة صنف' };
+  await assertSucceeds(setDoc(doc(admin, itemPath), stock));
+  await assertSucceeds(setDoc(doc(admin, optionPath), options));
+  await assertSucceeds(setDoc(doc(admin, logPath), log));
+  await assertSucceeds(updateDoc(doc(admin, itemPath), {
+    meters: 8, updatedByUid: 'admin-1', updatedBy: 'عمر', updatedAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(admin, itemPath), {
+    categoryId: 'ceramics', updatedByUid: 'admin-1', updatedBy: 'عمر', updatedAt: serverTimestamp(),
+  }));
+  assert.equal((await getDoc(doc(admin, itemPath))).data().meters, 8);
+  assert.equal((await getDoc(doc(admin, 'tiles/legacy-tile'))).data().meters, 10);
+  assert.equal((await getDocs(collection(admin, root + '/stock'))).size, 1);
+
+  await testEnv.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), 'staff/inactive-1'), { role: 'admin' });
+  });
+  for (const context of [
+    testEnv.authenticatedContext('employee-1'),
+    testEnv.authenticatedContext('inactive-1'),
+    testEnv.unauthenticatedContext(),
+  ]) {
+    const restricted = context.firestore();
+    for (const path of [itemPath, optionPath, logPath]) {
+      await assertFails(getDoc(doc(restricted, path)));
+      await assertFails(setDoc(doc(restricted, path), { name: 'unauthorized' }));
+    }
+    for (const group of ['stock', 'options', 'logs']) {
+      await assertFails(getDocs(collection(restricted, root + '/' + group)));
+    }
+    await assertFails(deleteDoc(doc(restricted, itemPath)));
+  }
+  const employee = testEnv.authenticatedContext('employee-1').firestore();
+  assert.equal((await getDoc(doc(employee, 'tiles/legacy-tile'))).data().meters, 10);
+});

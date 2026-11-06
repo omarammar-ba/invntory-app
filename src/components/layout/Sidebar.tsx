@@ -1,7 +1,8 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import type { Category, ViewMode, StaffMember } from '@/types';
-import { Settings2, X, UsersRound, DatabaseBackup, LogOut, Layers } from 'lucide-react';
+import { Settings2, X, UsersRound, DatabaseBackup, LogOut, Layers, Warehouse } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useMediaQuery';
+import { WAREHOUSE_NAME } from '@/features/warehouse/warehouseName';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface SidebarProps {
   onManageCategories?: () => void;
   onOpenCategoryManager?: (categoryId?: string | null) => void;
   onOpenSettings?: () => void;
+  onOpenWarehouse?: () => void;
   onOpenStaffManager?: () => void;
   onOpenBackupModal?: () => void;
   currentStaff?: StaffMember | null;
@@ -25,7 +27,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({
   isOpen, onClose, activeTab,
-  onOpenSettings, onOpenStaffManager, onOpenBackupModal, currentStaff, onLogout,
+  onOpenSettings, onOpenWarehouse, onOpenStaffManager, onOpenBackupModal, currentStaff, onLogout,
 }) => {
   const mobile = useIsMobile();
   const asideRef = useRef<HTMLElement>(null);
@@ -78,6 +80,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           {role !== 'employee' && onOpenStaffManager && link('الموظفين', UsersRound, activeTab === 'staff', onOpenStaffManager)}
           {onOpenBackupModal && link('النسخ الاحتياطي', DatabaseBackup, activeTab === 'backup', onOpenBackupModal)}
           {onOpenSettings && link('الإعدادات', Settings2, activeTab === 'settings', onOpenSettings)}
+          {role === 'admin' && currentStaff?.status === 'active' && onOpenWarehouse && link(WAREHOUSE_NAME, Warehouse, activeTab === 'warehouse', onOpenWarehouse)}
         </section>
       </div>
       {onLogout && <footer className="atelier-menu-footer"><button type="button" onClick={onLogout}><LogOut size={20} strokeWidth={1.7} />تسجيل الخروج</button></footer>}

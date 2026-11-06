@@ -10,6 +10,7 @@ import {
   UnitType,
   Category,
   CustomCategoryField,
+  PackingOption,
 } from '@/types';
 
 import {
@@ -62,6 +63,8 @@ interface TileFormProps {
   onCustomizeCategory?: (catId: string) => void;
   allowCategorySwitch?: boolean;
   canManageVisibility?: boolean;
+  sizePresets?: PackingOption[];
+  warehouseName?: string;
 }
 
 import { PORCELAIN_PRESETS, CERAMIC_PRESETS } from '@/features/voice/voice-presets.mjs';
@@ -111,7 +114,11 @@ const TileForm:
     onCustomizeCategory,
     allowCategorySwitch = false,
     canManageVisibility = true,
+    sizePresets,
+    warehouseName,
   }) => {
+    const porcelainPresets = activeCategoryId === 'tiles' && sizePresets ? sizePresets : PORCELAIN_PRESETS;
+    const ceramicPresets = activeCategoryId === 'ceramics' && sizePresets ? sizePresets : CERAMIC_PRESETS;
     const [
       selectedCatId,
       setSelectedCatId,
@@ -333,10 +340,10 @@ const TileForm:
 
           size:
             isPorcelain
-              ? PORCELAIN_PRESETS[0]
+              ? porcelainPresets[0]
                   .desc
               : isCeramic
-                ? CERAMIC_PRESETS[0]
+                ? ceramicPresets[0]
                     .desc
                 : '',
 
@@ -424,14 +431,14 @@ const TileForm:
           if (
             isPorcelain
           ) {
-            return PORCELAIN_PRESETS[0]
+            return porcelainPresets[0]
               .mBox;
           }
 
           if (
             isCeramic
           ) {
-            return CERAMIC_PRESETS[0]
+            return ceramicPresets[0]
               .mBox;
           }
 
@@ -448,14 +455,14 @@ const TileForm:
           if (
             isPorcelain
           ) {
-            return PORCELAIN_PRESETS[0]
+            return porcelainPresets[0]
               .bPallet;
           }
 
           if (
             isCeramic
           ) {
-            return CERAMIC_PRESETS[0]
+            return ceramicPresets[0]
               .bPallet;
           }
 
@@ -619,11 +626,21 @@ const TileForm:
           );
         }
 
-        if (
+        if (editingTile?.packing && sizePresets) {
+          const presets = isPorcelain ? porcelainPresets : ceramicPresets;
+          const { mBox, bPallet } = editingTile.packing;
+          const index = presets.findIndex(preset =>
+            preset.desc === seed.size && preset.mBox === mBox && preset.bPallet === bPallet,
+          );
+          setSelectedPresetIdx(index);
+          setMetersPerBox(mBox);
+          setBoxesPerPallet(bPallet);
+          setIsCustomSize(index < 0);
+        } else if (
           isPorcelain
         ) {
           const presetIndex =
-            PORCELAIN_PRESETS.findIndex(
+            porcelainPresets.findIndex(
               preset =>
                 preset.desc ===
                 seed.size,
@@ -638,13 +655,13 @@ const TileForm:
             );
 
             setMetersPerBox(
-              PORCELAIN_PRESETS[
+              porcelainPresets[
                 presetIndex
               ].mBox,
             );
 
             setBoxesPerPallet(
-              PORCELAIN_PRESETS[
+              porcelainPresets[
                 presetIndex
               ].bPallet,
             );
@@ -662,7 +679,7 @@ const TileForm:
           isCeramic
         ) {
           const presetIndex =
-            CERAMIC_PRESETS.findIndex(
+            ceramicPresets.findIndex(
               preset =>
                 preset.desc ===
                 seed.size,
@@ -677,13 +694,13 @@ const TileForm:
             );
 
             setMetersPerBox(
-              CERAMIC_PRESETS[
+              ceramicPresets[
                 presetIndex
               ].mBox,
             );
 
             setBoxesPerPallet(
-              CERAMIC_PRESETS[
+              ceramicPresets[
                 presetIndex
               ].bPallet,
             );
@@ -701,10 +718,10 @@ const TileForm:
       } else {
         const initialSize =
           isPorcelain
-            ? PORCELAIN_PRESETS[0]
+            ? porcelainPresets[0]
                 .desc
             : isCeramic
-              ? CERAMIC_PRESETS[0]
+              ? ceramicPresets[0]
                   .desc
               : '';
 
@@ -762,24 +779,24 @@ const TileForm:
           isPorcelain
         ) {
           setMetersPerBox(
-            PORCELAIN_PRESETS[0]
+            porcelainPresets[0]
               .mBox,
           );
 
           setBoxesPerPallet(
-            PORCELAIN_PRESETS[0]
+            porcelainPresets[0]
               .bPallet,
           );
         } else if (
           isCeramic
         ) {
           setMetersPerBox(
-            CERAMIC_PRESETS[0]
+            ceramicPresets[0]
               .mBox,
           );
 
           setBoxesPerPallet(
-            CERAMIC_PRESETS[0]
+            ceramicPresets[0]
               .bPallet,
           );
         }
@@ -795,6 +812,9 @@ const TileForm:
       effectiveCategory,
       isSystem,
       activeCustomFields,
+      porcelainPresets,
+      ceramicPresets,
+      sizePresets,
     ]);
 
     const handleCategorySwitch =
@@ -847,10 +867,10 @@ const TileForm:
 
             size:
               isNowPorcelain
-                ? PORCELAIN_PRESETS[0]
+                ? porcelainPresets[0]
                     .desc
                 : isNowCeramic
-                  ? CERAMIC_PRESETS[0]
+                  ? ceramicPresets[0]
                       .desc
                   : '',
           }),
@@ -860,12 +880,12 @@ const TileForm:
           isNowPorcelain
         ) {
           setMetersPerBox(
-            PORCELAIN_PRESETS[0]
+            porcelainPresets[0]
               .mBox,
           );
 
           setBoxesPerPallet(
-            PORCELAIN_PRESETS[0]
+            porcelainPresets[0]
               .bPallet,
           );
 
@@ -880,12 +900,12 @@ const TileForm:
           isNowCeramic
         ) {
           setMetersPerBox(
-            CERAMIC_PRESETS[0]
+            ceramicPresets[0]
               .mBox,
           );
 
           setBoxesPerPallet(
-            CERAMIC_PRESETS[0]
+            ceramicPresets[0]
               .bPallet,
           );
 
@@ -1057,10 +1077,10 @@ const TileForm:
 
         const preset =
           porcelain
-            ? PORCELAIN_PRESETS[
+            ? porcelainPresets[
                 index
               ]
-            : CERAMIC_PRESETS[
+            : ceramicPresets[
                 index
               ];
 
@@ -1453,6 +1473,9 @@ const TileForm:
         setIsSaving(true);
 
         try {
+          if (sizePresets) {
+            tileToSave.packing = { mBox: metersPerBox, bPallet: boxesPerPallet };
+          }
           await onSave(tileToSave);
         } catch (error) {
           console.error('Item save failed:', error);
@@ -1864,8 +1887,8 @@ const TileForm:
       AppChoiceOption[] =
       (
         isPorcelain
-          ? PORCELAIN_PRESETS
-          : CERAMIC_PRESETS
+          ? porcelainPresets
+          : ceramicPresets
       ).map(
         (
           preset,
@@ -1878,12 +1901,17 @@ const TileForm:
             index,
 
           label:
-            isPorcelain
+            sizePresets?.[index]?.quality
+              ? `${preset.desc.replace(/\*/g, '×')} · ${sizePresets[index].quality}`
+              : isPorcelain
               ? preset.label
               : preset.desc.replace(
                   /\*/g,
                   '×',
                 ),
+          description: sizePresets?.[index]
+            ? [sizePresets[index].quality ?? 'كل النخب', `${preset.mBox} م² بالكرتونة`].join(' · ')
+            : undefined,
         }),
       );
 
@@ -2094,9 +2122,9 @@ const TileForm:
           onCancel
         }
         title={
-          editingTile
-            ? 'تعديل الصنف'
-            : 'إضافة صنف'
+          warehouseName
+            ? `${editingTile ? 'تعديل الصنف' : 'إضافة صنف'} · ${warehouseName}`
+            : editingTile ? 'تعديل الصنف' : 'إضافة صنف'
         }
         mobileSnap="expanded"
         desktopMaxWidth="max-w-2xl"

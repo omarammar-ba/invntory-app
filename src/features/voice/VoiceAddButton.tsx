@@ -9,10 +9,12 @@ export default function VoiceAddButton({
   onClick,
   userId,
   compact = false,
+  showCoachmark = true,
 }: {
   onClick: () => void;
   userId?: string;
   compact?: boolean;
+  showCoachmark?: boolean;
 }) {
   const quota = useVoiceQuota(userId);
   const { dark, limited } = useAppAppearance();
@@ -48,14 +50,14 @@ export default function VoiceAddButton({
           آخر رصيد: {remaining} طلب تحليل
         </small>
       )}
-      <SearchCoachmark
+      {showCoachmark && <SearchCoachmark
         targetRef={ref}
         active={false}
         userId={userId}
         storagePrefix="inventory-voice-spotlight-v1"
         title="أضف صنفًا بصوتك"
         description="اضغط المايك واحكِ مواصفات الصنف، ثم اختر صورته وراجع البيانات قبل الحفظ."
-      />
+      />}
     </div>
   );
 }

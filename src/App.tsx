@@ -12,8 +12,10 @@ import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import BottomNav from "@/components/layout/BottomNav";
 import InventoryWorkspace from "@/features/inventory/InventoryWorkspace";
+import { WAREHOUSE_NAME } from '@/features/warehouse/warehouseName';
+const loadWarehousePage = () => import('@/features/warehouse/WarehousePage');
+const BackupModal = React.lazy(() => import('@/features/backup/BackupModal'));
 const VoiceAddModal = React.lazy(() => import('@/features/voice/VoiceAddModal'));
-import StartupScreen from "@/components/ui/StartupScreen";
 import { orderHomeCategories } from '@/features/dashboard/dashboardModel';
 import {
   ListIcon,
@@ -41,7 +43,6 @@ import {
 } from "@/features/inventory";
 import { CategoryManagerModal, DEFAULT_SHOWER_BOX_FIELDS, categoryService } from "@/features/categories";
 import { StaffManagerModal, staffService } from "@/features/staff";
-import { BackupModal } from "@/features/backup";
 import { SettingsModal, PrintPdfModal } from "@/features/settings";
 import { LogsView } from "@/features/logs";
 
@@ -69,7 +70,8 @@ type ViewMode =
   | 'logs'
   | 'settings'
   | 'staff'
-  | 'backup';
+  | 'backup'
+  | 'warehouse';
 
 type AddItemSource =
   | 'category'
@@ -148,6 +150,7 @@ const DEFAULT_CATEGORIES: Category[] = [
 
 
 const UI_CACHE_VERSION = 1;
+const WAREHOUSE_CATEGORIES = DEFAULT_CATEGORIES.filter(category => category.id === 'tiles' || category.id === 'ceramics');
 const UI_CACHE_PREFIX = 'inventory_ui_cache_v1';
 const INVENTORY_FIRST_PAGE_SIZE = 24;
 const INVENTORY_NEXT_PAGE_SIZE = 64;
@@ -329,9 +332,12 @@ const App: React.FC = () => {
   );
 
 
-  const [initialInventoryReady, setInitialInventoryReady] = useState(false);
-  const [startupWaitExpired, setStartupWaitExpired] = useState(false);
   const [globalAddCategoryId, setGlobalAddCategoryId] = useState<string | null>(null);
+  const [homeInventoryHydrated, setHomeInventoryHydrated] = useState(false);
+  const [WarehousePage, setWarehousePage] = useState<Awaited<ReturnType<typeof loadWarehousePage>>['default'] | null>(null);
+  const [warehouseRequested, setWarehouseRequested] = useState(false);
+  const [warehouseOpenError, setWarehouseOpenError] = useState(false);
+  const launchComplete = useRef(false);
 
   const [
     inventoryRefreshVersion,
@@ -494,13 +500,14 @@ const App: React.FC = () => {
       () => {
         setVoiceOpen(false);
         setVoiceValues(null);
-        setInitialInventoryReady(false);
-        setStartupWaitExpired(false);
+        setWarehouseRequested(false);
+        setWarehouseOpenError(false);
         setPorcelainTiles([]);
         setCeramicTiles([]);
         setOtherItems([]);
         setCategories([]);
         setCategoriesReady(false);
+        setHomeInventoryHydrated(false);
         setLogs([]);
         setSearchQuery('');
 
@@ -522,23 +529,12 @@ const App: React.FC = () => {
     return () => { document.removeEventListener('visibilitychange', syncMotion); document.documentElement.removeAttribute('data-ui-paused'); };
   }, []);
 
-  const startupReady = !authLoading && (!user || !currentStaff || (categoriesReady && (initialInventoryReady || startupWaitExpired)));
-  useEffect(() => {
-    if (startupReady) return;
-    const timer = window.setTimeout(() => setStartupWaitExpired(true), 8000);
-    return () => window.clearTimeout(timer);
-  }, [startupReady, user?.uid]);
-
-  useEffect(() => {
-    const splash = document.getElementById('app-launch-splash');
-    const label = document.getElementById('app-launch-status');
-    if (label) label.textContent = authLoading ? 'جارٍ التحقق من الحساب…' : startupWaitExpired ? 'الاتصال يأخذ وقتًا أطول من المعتاد…' : 'جارٍ تحضير المخزون…';
-    if (!startupReady && !startupWaitExpired) return;
-    if (!splash) { document.documentElement.classList.remove('app-launching'); return; }
-    splash.classList.add('app-launch-splash--hidden');
-    const timer = window.setTimeout(() => { splash.remove(); document.documentElement.classList.remove('app-launching'); }, 180);
-    return () => window.clearTimeout(timer);
-  }, [startupReady, authLoading, startupWaitExpired]);
+  React.useLayoutEffect(() => {
+    if (authLoading) return;
+    launchComplete.current = true;
+    document.getElementById('app-launch-splash')?.remove();
+    document.documentElement.classList.remove('app-launching');
+  }, [authLoading]);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -608,9 +604,10 @@ const App: React.FC = () => {
           setOtherItems(cachedUi.otherItems);
           setCategories(cachedUi.categories);
           setLogs(cachedUi.logs);
-          setInitialInventoryReady(true);
+          setHomeInventoryHydrated(true);
         }
 
+        setLoading(true);
         setCurrentStaff(activeStaff);
         setUser(u);
 
@@ -693,8 +690,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (
-      view ===
-        'staff' &&
+      (view === 'staff' || view === 'warehouse') &&
       currentStaff &&
       currentStaff.role !==
         'admin'
@@ -782,14 +778,14 @@ const App: React.FC = () => {
 
     const handleCategoryError = (error: any) => {
       console.error('Category subscription error:', error);
-      if (isPermissionDenied(error)) setCategories([]);
+      if (!isAdmin || isPermissionDenied(error)) setCategories([]);
       setCategoriesReady(true);
     };
 
     const ref = db.collection('categories');
     const unsubscribe = isAdmin
-      ? ref.onSnapshot(handleCategories, handleCategoryError)
-      : ref.where('visibleToEmployees', '==', true).onSnapshot(handleCategories, handleCategoryError);
+      ? ref.onSnapshot(handleCategories, handleCategoryError, { serverConfirmed: true })
+      : ref.where('visibleToEmployees', '==', true).onSnapshot(handleCategories, handleCategoryError, { serverConfirmed: true });
 
     return () => unsubscribe?.();
   }, [user?.uid, currentStaff?.id, currentStaff?.role, currentStaff?.status]);
@@ -869,21 +865,6 @@ const App: React.FC = () => {
       );
     }
 
-    // Open once each permitted collection has delivered its first page. Further
-    // pages still use the same queries and continue under the existing sync state.
-    let pendingInitialPages = (isAdmin || visibleCategoryIds.has('tiles') ? 1 : 0)
-      + (isAdmin || visibleCategoryIds.has('ceramics') ? 1 : 0)
-      + (isAdmin ? 1 : Array.from(visibleCategoryIds).filter(id => id !== 'tiles' && id !== 'ceramics').length);
-    const createFirstPageSignal = () => {
-      let signalled = false;
-      return () => {
-        if (signalled || cancelled) return;
-        signalled = true;
-        pendingInitialPages--;
-        if (pendingInitialPages === 0) setInitialInventoryReady(true);
-      };
-    };
-
     const mapPage = (
       snapshot: any,
       forcedCategoryId?: string
@@ -910,7 +891,6 @@ const App: React.FC = () => {
     ) => {
       let cursor: string | null = null;
       let accumulated: Tile[] = [];
-      const firstPageReady = createFirstPageSignal();
 
       try {
         while (!cancelled) {
@@ -949,7 +929,6 @@ const App: React.FC = () => {
               startTransition(() => setter(nextItems));
             }
           }
-          firstPageReady();
 
           if (snapshot.docs.length < pageSize) break;
 
@@ -973,8 +952,6 @@ const App: React.FC = () => {
         setInventorySyncError(
           'تعذر تحديث جزء من المخزون. اضغط إعادة المحاولة.'
         );
-      } finally {
-        firstPageReady();
       }
     };
 
@@ -1031,7 +1008,6 @@ const App: React.FC = () => {
             const preserveExisting = otherItems.some(
               item => item.categoryId === categoryId
             );
-            const firstPageReady = createFirstPageSignal();
 
             try {
               while (!cancelled) {
@@ -1060,7 +1036,6 @@ const App: React.FC = () => {
                     startTransition(() => setOtherItems(nextItems));
                   }
                 }
-                firstPageReady();
 
                 if (snapshot.docs.length < pageSize) break;
                 cursor = snapshot.docs[snapshot.docs.length - 1]?.id || null;
@@ -1083,8 +1058,6 @@ const App: React.FC = () => {
               setInventorySyncError(
                 'تعذر تحديث جزء من المخزون. اضغط إعادة المحاولة.'
               );
-            } finally {
-              firstPageReady();
             }
           })()
         );
@@ -1094,7 +1067,10 @@ const App: React.FC = () => {
     }
 
     void Promise.allSettled(inventoryLoads).then(() => {
-      if (!cancelled) startTransition(() => { setLoading(false); setInitialInventoryReady(true); });
+      if (!cancelled) startTransition(() => {
+        setHomeInventoryHydrated(true);
+        setLoading(false);
+      });
     });
 
     return () => {
@@ -1283,14 +1259,18 @@ const App: React.FC = () => {
       !user ||
       !currentStaff ||
       !categoriesReady ||
-      loading
+      loading ||
+      inventorySyncError
     ) {
       return;
     }
 
     let idleCallbackId: number | null = null;
     let fallbackTimeoutId: number | null = null;
+    let saved = false;
     const saveCache = () => {
+      if (saved) return;
+      saved = true;
       writeInventoryUiCache(user.uid, currentStaff.role, {
         porcelainTiles,
         ceramicTiles,
@@ -1308,8 +1288,10 @@ const App: React.FC = () => {
         fallbackTimeoutId = window.setTimeout(saveCache, 250);
       }
     }, INVENTORY_CACHE_WRITE_DELAY_MS);
+    window.addEventListener('pagehide', saveCache);
 
     return () => {
+      window.removeEventListener('pagehide', saveCache);
       window.clearTimeout(timeoutId);
       if (idleCallbackId !== null) window.cancelIdleCallback(idleCallbackId);
       if (fallbackTimeoutId !== null) window.clearTimeout(fallbackTimeoutId);
@@ -1319,6 +1301,7 @@ const App: React.FC = () => {
     currentStaff,
     categoriesReady,
     loading,
+    inventorySyncError,
     porcelainTiles,
     ceramicTiles,
     otherItems,
@@ -1470,24 +1453,12 @@ const App: React.FC = () => {
         if (!isEmployee) {
           return logs;
         }
+        if (!categoriesReady) return [];
 
         // Employee log subscriptions are already scoped to categories that are
         // visible to that employee. New logs also carry item visibility, so a
         // fresh add/delete can appear immediately without waiting for the paged
         // inventory list, while admin-only items stay hidden from the UI.
-        const allowedCategoryIds =
-          new Set(
-            categories
-              .filter(
-                category =>
-                  category.visibleToEmployees === true
-              )
-              .map(
-                category =>
-                  category.id
-              )
-          );
-
         const visibleNames =
           new Set(
             allItemsCombined.map(
@@ -1500,7 +1471,7 @@ const App: React.FC = () => {
           log => {
             if (
               log.categoryId &&
-              !allowedCategoryIds.has(
+              !allowedItemCategoryIds.has(
                 log.categoryId
               )
             ) {
@@ -1533,7 +1504,8 @@ const App: React.FC = () => {
       [
         isEmployee,
         logs,
-        categories,
+        categoriesReady,
+        allowedItemCategoryIds,
         allItemsCombined
       ]
     );
@@ -2636,6 +2608,8 @@ const App: React.FC = () => {
         newView:
           ViewMode
       ) => {
+        setWarehouseRequested(false);
+        setWarehouseOpenError(false);
         if (newView === 'backup') {
           if (inventorySyncError) {
             alert(
@@ -2669,8 +2643,7 @@ const App: React.FC = () => {
         }
 
         if (
-          newView ===
-            'staff' &&
+          (newView === 'staff' || newView === 'warehouse') &&
           currentStaff?.role !==
             'admin'
         ) {
@@ -2683,11 +2656,7 @@ const App: React.FC = () => {
           );
         }
 
-        window.scrollTo({
-          top: 0,
-          behavior:
-            'smooth'
-        });
+        window.scrollTo({ top: 0, behavior: newView === 'dashboard' || newView === 'warehouse' ? 'instant' : 'smooth' });
       },
       [
         currentStaff,
@@ -2695,6 +2664,21 @@ const App: React.FC = () => {
         inventorySyncError
       ]
     );
+
+  useEffect(() => {
+    if (!warehouseRequested || currentStaff?.role !== 'admin' || currentStaff.status !== 'active') return;
+    let cancelled = false;
+    void loadWarehousePage().then(({ default: Page }) => {
+      if (cancelled) return;
+      setWarehousePage(() => Page);
+      changeView('warehouse');
+    }).catch(() => {
+      if (cancelled) return;
+      setWarehouseRequested(false);
+      setWarehouseOpenError(true);
+    });
+    return () => { cancelled = true; };
+  }, [warehouseRequested, currentStaff, changeView]);
 
   const handleCategoryChange =
     useCallback(
@@ -2899,11 +2883,8 @@ const App: React.FC = () => {
     }
   }, [loading, pendingInventoryAction, inventorySyncError]);
 
-  if (!startupReady) {
-    return <StartupScreen message={authLoading ? 'جارٍ التحقق من الحساب…' : 'جارٍ تحضير المخزون…'} slow={startupWaitExpired} />;
-  }
-
-  if (!user || !currentStaff) {
+  if (authLoading && !launchComplete.current) return null;
+  if (authLoading || !user || !currentStaff) {
     return <Login />;
   }
 
@@ -2970,6 +2951,11 @@ const App: React.FC = () => {
             'settings'
           )
         }
+        onOpenWarehouse={() => {
+          setWarehouseOpenError(false);
+          if (WarehousePage) changeView('warehouse');
+          else setWarehouseRequested(true);
+        }}
         onOpenStaffManager={() =>
           changeView(
             'staff'
@@ -3031,7 +3017,9 @@ const App: React.FC = () => {
             currentStaff
           }
           title={
-            view ===
+            view === 'warehouse' && currentStaff.role === 'admin'
+              ? WAREHOUSE_NAME
+              : view ===
               'dashboard'
               ? 'إدارة مخزون'
               : view ===
@@ -3053,7 +3041,8 @@ const App: React.FC = () => {
           }
         />
 
-        {inventorySyncError && (
+        {warehouseOpenError && <ActionFeedback tone="error" message="تعذر فتح مستودع نعيمه. افتحه من القائمة مرة ثانية." />}
+        {inventorySyncError && view !== 'warehouse' && (
           <div className="mx-3 mt-2 flex items-center justify-between gap-3 rounded-[13px] border border-amber-200/70 bg-amber-50/90 px-3 py-2 text-[11px] font-semibold text-amber-800 shadow-sm dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300 sm:mx-6 lg:mx-8">
             <span>{inventorySyncError}</span>
             <button
@@ -3109,9 +3098,8 @@ const App: React.FC = () => {
                     allTiles={
                       allItemsCombined
                     }
-                    categories={
-                      categories
-                    }
+                    categories={categoriesReady ? categories : isEmployee ? [] : categories.length ? categories : DEFAULT_CATEGORIES}
+                    inventoryHydrated={homeInventoryHydrated && (!isEmployee || categoriesReady)}
                     logs={
                       visibleLogs
                     }
@@ -3119,7 +3107,7 @@ const App: React.FC = () => {
                       currentStaff
                     }
                     isSyncing={
-                      loading
+                      !categoriesReady || loading
                     }
                     searchInputRef={homeSearchInputRef}
                     onSearchActiveChange={setIsHomeSearching}
@@ -3151,6 +3139,9 @@ const App: React.FC = () => {
                         )
                     }
                   />
+                ) : view === 'warehouse' && WarehousePage && currentStaff.role === 'admin' && currentStaff.status === 'active' ? (
+                  <WarehousePage key={currentStaff.id} staff={currentStaff} categories={WAREHOUSE_CATEGORIES}
+                    onBack={() => changeView('dashboard')} />
                 ) : view ===
                   'inventory' ? (
                   <InventoryWorkspace
@@ -3322,6 +3313,7 @@ const App: React.FC = () => {
                   />
                 ) : view ===
                   'backup' ? (
+                  <React.Suspense fallback={<p role="status">جارٍ فتح النسخ الاحتياطي…</p>}>
                   <BackupModal
                     isPage
                     onClose={() =>
@@ -3351,6 +3343,7 @@ const App: React.FC = () => {
                       categories
                     })}
                   />
+                  </React.Suspense>
                 ) : (
                   <div
                     className="
@@ -3412,7 +3405,7 @@ const App: React.FC = () => {
         />
       )}
 
-      <BottomNav
+      {view !== 'warehouse' && <BottomNav
         isSearching={isHomeSearching}
         onSearch={() => {
           // Focus within the tap event so iOS opens the keyboard as well.
@@ -3473,7 +3466,7 @@ const App: React.FC = () => {
             'logs'
           );
         }}
-      />
+      />}
 
       {pendingInventoryAction && (
         <div

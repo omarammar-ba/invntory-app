@@ -1,5 +1,6 @@
 import { MotionModal } from '@/components/motion/MotionModal';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Tile, Category, StaffMember } from '@/types';
 import { PrintIcon, CancelIcon } from '@/components/ui/Icons';
 import { calculateAvailableQuantity, calculateReservedQuantity } from '@/features/inventory/inventoryCalculations';
@@ -11,6 +12,7 @@ interface PrintPdfModalProps {
   activeCategoryId: string;
   allItems: Tile[];
   currentStaff?: StaffMember | null;
+  warehouseName?: string;
 }
 
 const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
@@ -19,7 +21,8 @@ const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
   categories,
   activeCategoryId,
   allItems,
-  currentStaff
+  currentStaff,
+  warehouseName,
 }) => {
   const [selectedCategoryScope, setSelectedCategoryScope] = useState<string>(activeCategoryId || 'all');
   const [stockFilter, setStockFilter] = useState<'all' | 'available' | 'reserved'>('all');
@@ -168,7 +171,7 @@ const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
       const html2pdfModule = (await import('html2pdf.js')).default;
       const opt = {
         margin: [10, 10, 12, 10] as [number, number, number, number],
-        filename: `Inventory_Report_${new Date().toISOString().slice(0, 10)}.pdf`,
+        filename: `${warehouseName || 'Inventory_Report'}_${new Date().toISOString().slice(0, 10)}.pdf`,
         image: { type: 'jpeg' as 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, letterRendering: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as 'portrait' }
@@ -191,16 +194,13 @@ const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
 
 
 
-  return (
+  return createPortal(
     <MotionModal
       showHandle={false}
-      className="bg-white dark:bg-neutral-900 rounded-[22px] shadow-2xl border border-slate-200/60 dark:border-white/[0.07] overflow-hidden flex flex-col max-h-[96dvh] min-w-0 print:max-h-none print:h-auto print:border-none print:shadow-none print:rounded-none print:bg-white"
-      backdropClassName="fixed inset-0 z-[420] overflow-hidden bg-black/75 backdrop-blur-sm flex justify-center items-center p-2 sm:p-4 print:p-0 print:bg-white print:static print:overflow-visible"
+      className="w-full max-w-[1180px] max-h-full min-w-0 overflow-y-auto overscroll-contain rounded-[22px] border border-slate-200/60 bg-white shadow-2xl dark:border-white/[0.07] dark:bg-neutral-900 print:max-h-none print:overflow-visible print:border-none print:shadow-none print:rounded-none print:bg-white"
+      backdropClassName="fixed inset-0 z-[420] overflow-hidden bg-black/75 backdrop-blur-sm flex justify-center items-center px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4 print:p-0 print:bg-white print:static print:overflow-visible"
     >
-      <div
-        className="flex min-h-0 w-full flex-1 flex-col overflow-hidden"
-        style={{ width: 'min(1180px, calc(100vw - 16px))', maxWidth: '1180px' }}
-      >
+      <div className="w-full">
       
       {/* Container Dialog */}
         
@@ -308,7 +308,7 @@ const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
         </div>
 
         {/* Scrollable Document Preview Area & Real Printable Section */}
-        <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6 lg:p-8 bg-slate-100/60 dark:bg-neutral-950 custom-scrollbar print:p-0 print:bg-white print:overflow-visible">
+        <div className="overflow-x-auto p-3 sm:p-6 lg:p-8 bg-slate-100/60 dark:bg-neutral-950 custom-scrollbar print:p-0 print:bg-white print:overflow-visible">
           
           {isPreparingReport ? (
             <div className="flex min-h-[360px] flex-col items-center justify-center rounded-[16px] border border-slate-200/70 bg-white px-6 text-center shadow-sm dark:border-white/[0.07] dark:bg-neutral-900">
@@ -330,7 +330,7 @@ const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
               {/* Right: Section Name */}
               <div>
                 <span className="text-xs uppercase tracking-widest text-slate-500 font-bold block mb-1">كشف حركة ومخزون</span>
-                <h1 className="text-xl font-black text-slate-900 tracking-tight m-0">{currentCategoryName}</h1>
+                <h1 className="text-xl font-black text-slate-900 tracking-tight m-0">{warehouseName ? `${warehouseName} · ${currentCategoryName}` : currentCategoryName}</h1>
               </div>
 
               {/* Left: Minimal Clean Metadata (Day, Date, Staff - NO TIME, NO BOXES) */}
@@ -461,7 +461,8 @@ const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
         </div>
       </div>
 
-      </MotionModal>
+      </MotionModal>,
+      document.body,
   );
 };
 

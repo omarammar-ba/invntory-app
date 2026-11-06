@@ -35,17 +35,22 @@ self.addEventListener('fetch', event => {
   if (/^\/(src|@vite|@react-refresh|@id|@fs|node_modules)(\/|$)/.test(url.pathname)) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE_VERSION).then(cache => cache.put('/index.html', copy));
-          return response;
-        })
-        .catch(async () =>
-          (await caches.match('/index.html')) || (await caches.match('/')),
-        ),
-    );
+    const cache = caches.open(CACHE_VERSION);
+    const cached = cache.then(store => store.match('/index.html')).catch(() => undefined);
+    let freshPage;
+    const network = fetch(request).then(response => {
+      if (response.ok) freshPage = response.clone();
+      return response;
+    }).catch(() => undefined);
+    // A cached launch can render while a slow connection refreshes the shell.
+    const quickCache = new Promise(resolve => setTimeout(resolve, 500)).then(() => cached);
+    event.respondWith((async () => {
+      const first = await Promise.race([network, quickCache]);
+      return first || await cached || await network || Response.error();
+    })());
+    event.waitUntil(network.then(async () => {
+      if (freshPage) await (await cache).put('/index.html', freshPage);
+    }).catch(() => undefined));
     return;
   }
 
@@ -57,6 +62,9 @@ self.addEventListener('fetch', event => {
 
   event.respondWith(
     caches.match(request).then(cached => {
+      // Content-hashed build assets can be served without a network request.
+      const immutable = /^\/assets\/.+-[A-Za-z0-9_-]{8,}\.(?:js|css)$/.test(url.pathname);
+      if (immutable && cached) return cached;
       const network = fetch(request)
         .then(response => {
           if (response.ok) {
@@ -65,11 +73,8 @@ self.addEventListener('fetch', event => {
           }
           return response;
         })
-        .catch(() => cached);
-
-      // Only content-hashed build assets are immutable; stable URLs use fresh bytes.
-      const immutable = /^\/assets\/.+-[A-Za-z0-9_-]{8,}\.(?:js|css)$/.test(url.pathname);
-      return immutable && cached ? cached : network;
+        .catch(() => cached || Response.error());
+      return network;
     }),
   );
 });

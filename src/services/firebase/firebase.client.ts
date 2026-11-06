@@ -74,6 +74,11 @@ let appInstance: FirebaseApp | null = null;
 let rawFirestore: Firestore | null = null;
 let rawAuth: Auth | null = null;
 
+export function requireFirestore(): Firestore {
+  if (!rawFirestore) throw new Error('الاتصال بقاعدة البيانات غير متاح.');
+  return rawFirestore;
+}
+
 if (isFirebaseConfigured) {
   try {
     appInstance = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -168,7 +173,8 @@ export interface QueryRef {
   get: () => Promise<{ empty: boolean; docs: Array<{ id: string; data: () => any }> }>;
   onSnapshot: (
     onNext: (snapshot: { empty: boolean; docs: Array<{ id: string; data: () => any }> }) => void,
-    onError?: (error: any) => void
+    onError?: (error: any) => void,
+    options?: { serverConfirmed?: boolean },
   ) => () => void;
 }
 
@@ -325,7 +331,8 @@ const createCollectionRef = (collectionName: string): CollectionRef => {
       },
       onSnapshot(
         onNext,
-        onError
+        onError,
+        options
       ) {
         if (rawFirestore) {
           try {
@@ -375,10 +382,19 @@ const createCollectionRef = (collectionName: string): CollectionRef => {
                   )
                 : colRef;
 
+            let confirmed = false;
             return onSnapshot(
               firestoreQuery,
-
+              { includeMetadataChanges: options?.serverConfirmed === true },
               snapshot => {
+                if (options?.serverConfirmed) {
+                  if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) {
+                    confirmed = false;
+                    return;
+                  }
+                  if (confirmed && snapshot.docChanges().length === 0) return;
+                  confirmed = true;
+                }
                 onNext({
                   empty:
                     snapshot.empty,

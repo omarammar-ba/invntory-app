@@ -23,6 +23,8 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    document.getElementById('app-launch-splash')?.remove();
+    document.documentElement.classList.remove('app-launching');
     console.error('Uncaught runtime error:', error, errorInfo);
   }
 
