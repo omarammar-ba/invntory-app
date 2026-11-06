@@ -11,6 +11,7 @@ import InventoryWorkspace from '@/features/inventory/InventoryWorkspace';
 import { LogsView } from '@/features/logs';
 import { PrintPdfModal } from '@/features/settings';
 import type { Category, LogEntry, StaffMember, Tile } from '@/types';
+import { useSwipeBack } from '@/hooks/useSwipeBack';
 import { WAREHOUSE_NAME } from './warehouseName';
 import {
   allSizes, changeStock, EMPTY_OPTIONS, packingKey, saveOptions, watchWarehouse,
@@ -118,10 +119,11 @@ function WarehouseSizes({ category, options }: {
     {status && <p role="status" className="warehouse-feedback">{status}</p>}
   </section>;
 }
-export default function WarehousePage({ staff, categories, onBack }: {
+export default function WarehousePage({ staff, categories, onBack, onSwipeBack }: {
   staff: StaffMember;
   categories: Category[];
   onBack: () => void;
+  onSwipeBack?: () => void;
 }) {
   const [categoryId, setCategoryId] = useState<WarehouseCategory>('tiles');
   const [panel, setPanel] = useState<Panel>('stock');
@@ -141,6 +143,16 @@ export default function WarehousePage({ staff, categories, onBack }: {
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
   const canAccess = staff.role === 'admin' && staff.status === 'active';
+  useSwipeBack(canAccess && onSwipeBack && !editor && !reserving && !deleting && !image && !printing && !fullList
+    ? () => {
+      if (panel === 'stock') onSwipeBack();
+      else {
+        setPanel('stock');
+        setError('');
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+    }
+    : undefined);
   const privateCategories = useMemo<Category[]>(() => categories.map(category => ({
     ...category,
     themeColor: category.id === 'ceramics' ? 'emerald' : 'sky',

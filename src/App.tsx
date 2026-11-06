@@ -14,6 +14,7 @@ import BottomNav from "@/components/layout/BottomNav";
 import InventoryWorkspace from "@/features/inventory/InventoryWorkspace";
 import WarehousePage from '@/features/warehouse/WarehousePage';
 import { WAREHOUSE_NAME } from '@/features/warehouse/warehouseName';
+import { useSwipeBack } from '@/hooks/useSwipeBack';
 const BackupModal = React.lazy(() => import('@/features/backup/BackupModal'));
 const VoiceAddModal = React.lazy(() => import('@/features/voice/VoiceAddModal'));
 import { orderHomeCategories } from '@/features/dashboard/dashboardModel';
@@ -76,6 +77,8 @@ type ViewMode =
 type AddItemSource =
   | 'category'
   | 'global';
+
+type SwipeScreen = { view: ViewMode; categoryId: string | null; model: string | null };
 
 const DEFAULT_CATEGORIES: Category[] = [
   {
@@ -392,6 +395,7 @@ const App: React.FC = () => {
   ] = useState<ViewMode>(
     'dashboard'
   );
+  const swipeTrail = useRef<SwipeScreen[]>([]);
 
   const [
     isAddingNew,
@@ -495,6 +499,7 @@ const App: React.FC = () => {
   const clearSecuritySensitiveState =
     useCallback(
       () => {
+        swipeTrail.current = [];
         setVoiceOpen(false);
         setVoiceValues(null);
         setPorcelainTiles([]);
@@ -2685,6 +2690,48 @@ const App: React.FC = () => {
       []
     );
 
+  React.useLayoutEffect(() => {
+    if (!currentStaff || authLoading) return;
+    const screen: SwipeScreen = {
+      view,
+      categoryId: view === 'inventory' ? activeCategoryId : null,
+      model: view === 'logs' ? selectedModelForLogs : null,
+    };
+    if (view === 'dashboard') {
+      swipeTrail.current = [screen];
+      return;
+    }
+    const trail = swipeTrail.current;
+    const last = trail[trail.length - 1];
+    if (last?.view === screen.view && last.categoryId === screen.categoryId) {
+      trail[trail.length - 1] = screen;
+    } else {
+      trail.push(screen);
+      if (trail.length > 32) trail.shift();
+    }
+  }, [view, activeCategoryId, selectedModelForLogs, currentStaff, authLoading]);
+
+  const goBackBySwipe = () => {
+    const trail = swipeTrail.current;
+    trail.pop();
+    const previous = trail[trail.length - 1];
+    const needsAdmin = previous?.view === 'warehouse' || previous?.view === 'staff';
+    const categoryAvailable = !previous?.categoryId || categories.some(category => category.id === previous.categoryId);
+    if (!previous || !categoryAvailable || (needsAdmin && currentStaff?.role !== 'admin')) {
+      changeView('dashboard');
+      return;
+    }
+    if (previous.categoryId) setActiveCategoryId(previous.categoryId);
+    setSelectedModelForLogs(previous.model);
+    setView(previous.view);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  const swipeBlocked = authLoading || !currentStaff || isSidebarOpen || isAddingNew || editingTile ||
+    viewingImage || reservingTile || deleteTargetId || isFullListModalOpen || isCategoryModalOpen ||
+    isSettingsModalOpen || isStaffModalOpen || isPrintPdfModalOpen || voiceOpen || pendingInventoryAction;
+  useSwipeBack(!swipeBlocked && view !== 'dashboard' && view !== 'warehouse' ? goBackBySwipe : undefined);
+
   const filteredTiles =
     useMemo(
       () => {
@@ -3114,7 +3161,7 @@ const App: React.FC = () => {
                   />
                 ) : view === 'warehouse' && currentStaff.role === 'admin' && currentStaff.status === 'active' ? (
                   <WarehousePage key={currentStaff.id} staff={currentStaff} categories={WAREHOUSE_CATEGORIES}
-                    onBack={() => changeView('dashboard')} />
+                    onBack={() => changeView('dashboard')} onSwipeBack={swipeBlocked ? undefined : goBackBySwipe} />
                 ) : view ===
                   'inventory' ? (
                   <InventoryWorkspace
