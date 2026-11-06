@@ -34,6 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const role = currentStaff?.role ?? null;
+  const canOpenWarehouse = role === 'admin' && currentStaff?.status === 'active' && onOpenWarehouse;
 
   useLayoutEffect(() => {
     const aside = asideRef.current;
@@ -80,10 +81,14 @@ const Sidebar: React.FC<SidebarProps> = ({
           {role !== 'employee' && onOpenStaffManager && link('الموظفين', UsersRound, activeTab === 'staff', onOpenStaffManager)}
           {onOpenBackupModal && link('النسخ الاحتياطي', DatabaseBackup, activeTab === 'backup', onOpenBackupModal)}
           {onOpenSettings && link('الإعدادات', Settings2, activeTab === 'settings', onOpenSettings)}
-          {role === 'admin' && currentStaff?.status === 'active' && onOpenWarehouse && link(WAREHOUSE_NAME, Warehouse, activeTab === 'warehouse', onOpenWarehouse)}
         </section>
       </div>
-      {onLogout && <footer className="atelier-menu-footer"><button type="button" onClick={onLogout}><LogOut size={20} strokeWidth={1.7} />تسجيل الخروج</button></footer>}
+      {(canOpenWarehouse || onLogout) && <footer className="atelier-menu-footer">
+        {canOpenWarehouse && <div className="atelier-menu-warehouse">
+          {link(WAREHOUSE_NAME, Warehouse, activeTab === 'warehouse', canOpenWarehouse)}
+        </div>}
+        {onLogout && <button type="button" onClick={onLogout}><LogOut size={20} strokeWidth={1.7} />تسجيل الخروج</button>}
+      </footer>}
     </aside>
   </>;
 };

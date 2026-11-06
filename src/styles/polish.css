@@ -315,6 +315,22 @@ html[data-ui-paused] .home-search-glass::after { animation-play-state: paused; }
   border-radius: 9px;
   background: var(--workspace-line);
 }
+
+.atelier-menu-warehouse { margin-block-end: 10px; }
+.atelier-menu-warehouse > .atelier-menu-link {
+  padding-inline: 12px;
+  border-color: #123e80;
+  background: linear-gradient(160deg, #2461b3, #0e3879);
+  box-shadow: inset 0 1px #ffffff40, 0 3px #0b2f66, 0 6px 12px #0d37633b;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 750;
+}
+.atelier-menu-warehouse > .atelier-menu-link > svg { color: inherit; }
+.atelier-menu-warehouse > .atelier-menu-link:is(:hover, [aria-current]) { background: linear-gradient(160deg, #2d6bc1, #134689); color: #fff; }
+.atelier-menu-warehouse > .atelier-menu-link:active { box-shadow: inset 0 1px 3px #08274b55, 0 1px #0b2f66; }
+:root.dark .atelier-menu-warehouse > .atelier-menu-link { border-color: #4a7cc7; color: #fff; }
+:root.dark .atelier-menu-warehouse > .atelier-menu-link:is(:hover, [aria-current]) { background: linear-gradient(160deg, #2d6bc1, #134689); }
 @media (prefers-contrast: more) {
  .atelier-nav .atelier-nav-glass::before { border-color: #6b83a1; }
  .dark .atelier-nav .atelier-nav-glass::before { border-color: #999; }

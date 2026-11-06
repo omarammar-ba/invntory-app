@@ -47,7 +47,7 @@
   gap: .55rem;
 }
 
-.warehouse-departments { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.warehouse-departments { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; }
 
 .warehouse-button {
   display: inline-flex;
@@ -65,21 +65,26 @@
 }
 
 .warehouse-departments > button {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  position: relative;
+  display: flex;
+  justify-content: center;
   align-items: center;
-  gap: .35rem;
-  min-height: 44px;
+  gap: .5rem;
+  min-height: 48px;
   padding: .3rem .55rem;
-  border: 1px solid var(--workspace-line);
-  border-radius: 12px;
   color: var(--workspace-ink);
-  font-size: .9rem;
-  text-align: start;
-  background: var(--workspace-paper);
+  font-size: .95rem;
+}
+.warehouse-departments > button + button::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block: .5rem;
+  border-inline-start: 1px solid var(--workspace-line);
 }
 .warehouse-department-mark {
   display: grid;
+  flex: none;
   place-items: center;
   width: 42px;
   height: 42px;
@@ -89,10 +94,9 @@
 .warehouse-department-mark .category-glass-mark { width: 42px; height: 42px; padding: 0; }
 .dark .warehouse-department-mark { color: var(--category-dark); }
 .warehouse-departments > button[aria-pressed="true"] {
-  border-color: currentColor;
   color: var(--category-ink);
-  background: color-mix(in srgb, var(--category-ink) 9%, var(--workspace-paper));
 }
+.warehouse-departments > button[aria-pressed="true"] > strong { font-weight: 850; }
 .dark .warehouse-departments > button[aria-pressed="true"] { color: var(--category-dark); }
 
 .warehouse-panels { grid-template-columns: repeat(3, minmax(0, 1fr)); }

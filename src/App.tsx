@@ -12,8 +12,8 @@ import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import BottomNav from "@/components/layout/BottomNav";
 import InventoryWorkspace from "@/features/inventory/InventoryWorkspace";
+import WarehousePage from '@/features/warehouse/WarehousePage';
 import { WAREHOUSE_NAME } from '@/features/warehouse/warehouseName';
-const loadWarehousePage = () => import('@/features/warehouse/WarehousePage');
 const BackupModal = React.lazy(() => import('@/features/backup/BackupModal'));
 const VoiceAddModal = React.lazy(() => import('@/features/voice/VoiceAddModal'));
 import { orderHomeCategories } from '@/features/dashboard/dashboardModel';
@@ -334,9 +334,6 @@ const App: React.FC = () => {
 
   const [globalAddCategoryId, setGlobalAddCategoryId] = useState<string | null>(null);
   const [homeInventoryHydrated, setHomeInventoryHydrated] = useState(false);
-  const [WarehousePage, setWarehousePage] = useState<Awaited<ReturnType<typeof loadWarehousePage>>['default'] | null>(null);
-  const [warehouseRequested, setWarehouseRequested] = useState(false);
-  const [warehouseOpenError, setWarehouseOpenError] = useState(false);
   const launchComplete = useRef(false);
 
   const [
@@ -500,8 +497,6 @@ const App: React.FC = () => {
       () => {
         setVoiceOpen(false);
         setVoiceValues(null);
-        setWarehouseRequested(false);
-        setWarehouseOpenError(false);
         setPorcelainTiles([]);
         setCeramicTiles([]);
         setOtherItems([]);
@@ -2608,8 +2603,6 @@ const App: React.FC = () => {
         newView:
           ViewMode
       ) => {
-        setWarehouseRequested(false);
-        setWarehouseOpenError(false);
         if (newView === 'backup') {
           if (inventorySyncError) {
             alert(
@@ -2664,21 +2657,6 @@ const App: React.FC = () => {
         inventorySyncError
       ]
     );
-
-  useEffect(() => {
-    if (!warehouseRequested || currentStaff?.role !== 'admin' || currentStaff.status !== 'active') return;
-    let cancelled = false;
-    void loadWarehousePage().then(({ default: Page }) => {
-      if (cancelled) return;
-      setWarehousePage(() => Page);
-      changeView('warehouse');
-    }).catch(() => {
-      if (cancelled) return;
-      setWarehouseRequested(false);
-      setWarehouseOpenError(true);
-    });
-    return () => { cancelled = true; };
-  }, [warehouseRequested, currentStaff, changeView]);
 
   const handleCategoryChange =
     useCallback(
@@ -2951,11 +2929,7 @@ const App: React.FC = () => {
             'settings'
           )
         }
-        onOpenWarehouse={() => {
-          setWarehouseOpenError(false);
-          if (WarehousePage) changeView('warehouse');
-          else setWarehouseRequested(true);
-        }}
+        onOpenWarehouse={() => changeView('warehouse')}
         onOpenStaffManager={() =>
           changeView(
             'staff'
@@ -3041,7 +3015,6 @@ const App: React.FC = () => {
           }
         />
 
-        {warehouseOpenError && <ActionFeedback tone="error" message="تعذر فتح مستودع نعيمه. افتحه من القائمة مرة ثانية." />}
         {inventorySyncError && view !== 'warehouse' && (
           <div className="mx-3 mt-2 flex items-center justify-between gap-3 rounded-[13px] border border-amber-200/70 bg-amber-50/90 px-3 py-2 text-[11px] font-semibold text-amber-800 shadow-sm dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300 sm:mx-6 lg:mx-8">
             <span>{inventorySyncError}</span>
@@ -3139,7 +3112,7 @@ const App: React.FC = () => {
                         )
                     }
                   />
-                ) : view === 'warehouse' && WarehousePage && currentStaff.role === 'admin' && currentStaff.status === 'active' ? (
+                ) : view === 'warehouse' && currentStaff.role === 'admin' && currentStaff.status === 'active' ? (
                   <WarehousePage key={currentStaff.id} staff={currentStaff} categories={WAREHOUSE_CATEGORIES}
                     onBack={() => changeView('dashboard')} />
                 ) : view ===

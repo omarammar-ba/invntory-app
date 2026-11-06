@@ -645,10 +645,13 @@
 .inventory-home .department-mark {
   min-height: 62px;
 }
-.atelier-menu-footer > button {
+.atelier-menu-footer > button,
+.atelier-menu-warehouse > .atelier-menu-link {
   justify-content: center;
   min-height: 49px;
   border-radius: 24px;
+}
+.atelier-menu-footer > button {
   background: #b12e48;
   color: #fff;
   font-weight: 600;
