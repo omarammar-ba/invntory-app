@@ -1,10 +1,13 @@
+import { prepareInventoryTranscript, preserveExplicitStockCode } from "../../../voice-api/src/inventory-transcript.mjs";
+import { parseStockCommand, parseStockEditFollowup, stockShortcut } from "../../../voice-api/src/stock-command.mjs";
+import type { StockAnalysis, StockCommand } from "./stock-command.types";
 import { publishVoiceUsage, type VoiceUsage } from "./voice-quota";
 import {
   convertQuantity,
   VOICE_UNITS,
   validAmount,
 } from "./voice-quantity.mjs";
-import { packingValues, resolvePreset, presetsFor } from "./voice-presets.mjs";
+import { packingValues, resolvePreset, presetsFor, voicePackingKey } from "./voice-presets.mjs";
 import { auth } from "@/services/firebase";
 import type { Category, Tile } from "@/types";
 export interface VoiceDraft {
@@ -80,6 +83,82 @@ export async function analyzeVoice(
       categories,
     );
   }
+  return validateResult(
+    await requestAnalysis(
+      audio,
+      categories,
+      categoryId,
+      signal,
+      correctionField,
+      onProgress,
+    ),
+    categories,
+  );
+}
+
+export async function analyzeStockCommand(
+  audio: Blob | string,
+  categories: Category[],
+  categoryId: string | null,
+  signal: AbortSignal,
+  onProgress?: (progress: VoiceProgress) => void,
+  editTarget?: string,
+): Promise<StockAnalysis> {
+  if (!voiceEndpoint || !auth.currentUser)
+    throw new Error("يلزم تسجيل الدخول وتفعيل خدمة الصوت.");
+  if (!backendEndpoint && directTestKey) {
+    const { analyzeDirectTest } = await import("./voice-direct-test");
+    return analyzeDirectTest(
+      audio,
+      categories,
+      categoryId,
+      directTestKey,
+      signal,
+      undefined,
+      onProgress,
+      true,
+      editTarget,
+    );
+  }
+  const result = await requestAnalysis(
+    audio,
+    categories,
+    categoryId,
+    signal,
+    undefined,
+    onProgress,
+    true,
+    editTarget,
+  );
+  if (typeof result.transcript !== "string" || !result.command)
+    throw new Error("خدمة الصوت تحتاج تحديثاً لدعم أوامر المخزون.");
+  const transcript = prepareInventoryTranscript(result.transcript);
+  if (editTarget && categoryId) return {
+    transcript,
+    command: parseStockEditFollowup(result.command, transcript, categories, categoryId, editTarget) as StockCommand,
+  };
+  return {
+    transcript,
+    command: (stockShortcut(transcript, categories, categoryId) || parseStockCommand(
+      preserveExplicitStockCode(result.command, transcript),
+      categories,
+      categoryId,
+    )) as StockCommand,
+  };
+}
+
+async function requestAnalysis(
+  audio: Blob | string,
+  categories: Category[],
+  categoryId: string | null,
+  signal: AbortSignal,
+  correctionField?: VoiceCorrectionField,
+  onProgress?: (progress: VoiceProgress) => void,
+  stockCommand = false,
+  editTarget?: string,
+) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("أعد تسجيل الدخول قبل استخدام المايك.");
   const url = new URL(backendEndpoint);
   if (
     url.protocol !== "https:" &&
@@ -114,6 +193,8 @@ export async function analyzeVoice(
   );
   body.append("categoryId", categoryId || "");
   if (correctionField) body.append("correctionField", correctionField);
+  if (stockCommand) body.append("mode", "stock-command");
+  if (editTarget) body.append("editTarget", editTarget);
   const res = await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
@@ -124,7 +205,7 @@ export async function analyzeVoice(
   if (result.usage) publishVoiceUsage(result.usage);
   if (!res.ok)
     throw new Error(result.error || "تعذر تحليل الصوت. حاول مرة أخرى.");
-  return validateResult(result, categories);
+  return result;
 }
 function validateResult(result: any, categories: Category[]): VoiceAnalysis {
   if (!result.draft || typeof result.transcript !== "string")
@@ -173,6 +254,7 @@ export function draftValues(
   draft: VoiceDraft,
   category: Category,
   packingChoice = "",
+  presets = presetsFor(category.id),
 ): Partial<Tile> {
   const values: Partial<Tile> = {
     categoryId: category.id,
@@ -182,8 +264,8 @@ export function draftValues(
     pallets: 0,
   };
   const preset = packingChoice
-    ? presetsFor(category.id).find((p) => p.desc === packingChoice)
-    : resolvePreset(draft, category.id);
+    ? presets.find((p) => voicePackingKey(p) === packingChoice)
+    : resolvePreset(draft, category.id, "", presets);
   const converted = convertQuantity(
     draft,
     preset,
@@ -205,9 +287,11 @@ export function draftValues(
   ] as const)
     if (typeof draft[key] === "string")
       values[key] = draft[key]!.slice(0, key === "notes" ? 1000 : 200);
-  const packing = packingValues(draft, category.id, packingChoice);
+  const packing = packingValues(draft, category.id, packingChoice, presets);
   if (packing && category.defaultUnit !== "pieces") {
     values.size = packing.size;
+    if (preset?.quality) values.quality = preset.quality;
+    values.packing = { mBox: packing.mBox, bPallet: packing.bPallet };
     values.boxes = packing.boxes;
     values.pallets = packing.pallets;
   }

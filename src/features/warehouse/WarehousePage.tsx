@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, type FormEvent } from 'react';
+import React, { useEffect, useMemo, useState, type FormEvent, type MutableRefObject } from 'react';
 import { ArrowRight, History, Package, Plus, Ruler } from 'lucide-react';
 import { ActionFeedback } from '@/components/ui/ActionFeedback';
 import ConfirmModal from '@/components/ui/ConfirmModal';
@@ -6,18 +6,24 @@ import CategoryGlassMark from '@/components/ui/CategoryGlassMark';
 import { categoryTone } from '@/components/ui/CategorySymbol';
 import { EMPTY_HOME_FILTERS, getLogDate, matchesHomeSearch } from '@/features/dashboard/dashboardModel';
 import SummaryCards from '@/features/dashboard/SummaryCards';
-import { FullListModal, ImageModal, ReservationModal, TileForm, TileList } from '@/features/inventory';
+import { FullListModal, ImageModal, ReservationModal, TileList } from '@/features/inventory';
 import InventoryWorkspace from '@/features/inventory/InventoryWorkspace';
 import { LogsView } from '@/features/logs';
-import { PrintPdfModal } from '@/features/settings';
 import type { Category, LogEntry, StaffMember, Tile } from '@/types';
 import { useSwipeBack } from '@/hooks/useSwipeBack';
+import StockVoiceLauncher from '@/features/voice/StockVoiceLauncher';
+import { useVoiceLaunch } from '@/features/voice/voice-capture';
+import { voiceEndpoint } from '@/features/voice/voice.service';
 import { WAREHOUSE_NAME } from './warehouseName';
 import {
-  allSizes, changeStock, EMPTY_OPTIONS, packingKey, saveOptions, watchWarehouse,
-  type WarehouseCategory, type WarehouseOptions, type WarehouseTile,
+  allSizes, changeStock, EMPTY_OPTIONS, isWarehouseCategory, packingKey, previewWarehouseVoiceItem, saveOptions, watchWarehouseStock, watchWarehouseOptions, watchWarehouseLogs,
+  type WarehouseCategory, type WarehouseOptions, type WarehouseSessionCache, type WarehouseTile,
 } from './warehouse.service';
 import './warehouse.css';
+
+const TileForm = React.lazy(() => import('@/features/inventory/TileForm'));
+const PrintPdfModal = React.lazy(() => import('@/features/settings/PrintPdfModal'));
+const VoiceAddModal = React.lazy(() => import('@/features/voice/VoiceAddModal'));
 
 const panels = [
   { id: 'stock', label: 'الأصناف', icon: Package },
@@ -26,7 +32,7 @@ const panels = [
 ] as const;
 
 type Panel = typeof panels[number]['id'];
-type Editor = { item: WarehouseTile | null; sizes: ReturnType<typeof allSizes> };
+type Editor = { item: WarehouseTile | null; sizes: ReturnType<typeof allSizes>; initialValues?: Partial<Tile>; voiceId?: string };
 type StockState = { items?: WarehouseTile[]; committed: WarehouseTile[] };
 const formatArea = (area: number) => area.toLocaleString('en-US', { maximumFractionDigits: 4 });
 const itemDate = (item: WarehouseTile) => getLogDate(item.createdAt)?.getTime() ?? 0;
@@ -119,17 +125,22 @@ function WarehouseSizes({ category, options }: {
     {status && <p role="status" className="warehouse-feedback">{status}</p>}
   </section>;
 }
-export default function WarehousePage({ staff, categories, onBack, onSwipeBack }: {
+export default function WarehousePage({ staff, categories, onBack, onSwipeBack, sessionCache, overlaysOpen = false }: {
   staff: StaffMember;
   categories: Category[];
   onBack: () => void;
   onSwipeBack?: () => void;
+  overlaysOpen?: boolean;
+  sessionCache: MutableRefObject<WarehouseSessionCache | null>;
 }) {
   const [categoryId, setCategoryId] = useState<WarehouseCategory>('tiles');
   const [panel, setPanel] = useState<Panel>('stock');
-  const [{ items: stock, committed }, setStock] = useState<StockState>({ committed: [] });
+  const cached = sessionCache.current?.staffId === staff.id ? sessionCache.current : null;
+  const [{ items: stock, committed }, setStock] = useState<StockState>(() => ({ items: cached?.stock, committed: [] }));
+  const [stockConfirmed, setStockConfirmed] = useState(false);
+  const [optionsConfirmed, setOptionsConfirmed] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>();
-  const [settings, setSettings] = useState<Partial<Record<WarehouseCategory, WarehouseOptions>>>();
+  const [settings, setSettings] = useState(() => cached?.settings);
   const [search, setSearch] = useState('');
   const [searchResetKey, setSearchResetKey] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -138,12 +149,17 @@ export default function WarehousePage({ staff, categories, onBack, onSwipeBack }
   const [hiddenItems, setHiddenItems] = useState<Set<string>>(() => new Set());
   const [image, setImage] = useState('');
   const [printing, setPrinting] = useState(false);
+  const { voiceOpen, capture, openVoice, closeVoice } = useVoiceLaunch();
+  const [voiceNotice, setVoiceNotice] = useState("");
   const [fullList, setFullList] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [optionsError, setOptionsError] = useState(false);
+  const [logsError, setLogsError] = useState(false);
+  const [slowSync, setSlowSync] = useState(false);
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
   const canAccess = staff.role === 'admin' && staff.status === 'active';
-  useSwipeBack(canAccess && onSwipeBack && !editor && !reserving && !deleting && !image && !printing && !fullList
+  useSwipeBack(canAccess && onSwipeBack && !editor && !reserving && !deleting && !image && !printing && !fullList && !voiceOpen
     ? () => {
       if (panel === 'stock') onSwipeBack();
       else {
@@ -158,12 +174,40 @@ export default function WarehousePage({ staff, categories, onBack, onSwipeBack }
     themeColor: category.id === 'ceramics' ? 'emerald' : 'sky',
   })), [categories]);
 
+  const denied = React.useRef(false);
+  const rejectAccess = React.useCallback((failure: unknown) => {
+    if ((failure as { code?: string } | null)?.code !== 'permission-denied') return false;
+    denied.current = true;
+    sessionCache.current = null;
+    setStock({ committed: [] });
+    setSettings(undefined);
+    setLogs(undefined);
+    closeVoice();
+    setEditor(null);
+    setLoadError(true);
+    return true;
+  }, [closeVoice, sessionCache]);
+
   useEffect(() => {
     if (!canAccess) return;
-    const fail = () => setLoadError(true);
+    let active = true;
+    const subscriptions: Array<() => void> = [];
+    const updateCache = (patch: Partial<WarehouseSessionCache>) => {
+      const previous = sessionCache.current?.staffId === staff.id ? sessionCache.current : null;
+      sessionCache.current = { ...previous, ...patch, staffId: staff.id };
+    };
+    const stockFailure = (failure: unknown) => {
+      if (active && !rejectAccess(failure)) setLoadError(true);
+    };
+    const optionsFailure = (failure: unknown) => {
+      if (active && !rejectAccess(failure)) setOptionsError(true);
+    };
     try {
-      return watchWarehouse(items => {
+      subscriptions.push(watchWarehouseStock(items => {
+        if (!active || denied.current) return;
         const sorted = items.slice().sort((a, b) => itemDate(b) - itemDate(a));
+        updateCache({ stock: sorted });
+        setStockConfirmed(true);
         const received = new Set(items.map(item => item.id));
         setStock(previous => ({ items: sorted, committed: previous.committed.filter(item => !received.has(item.id)) }));
         setHiddenItems(previous => {
@@ -171,11 +215,36 @@ export default function WarehousePage({ staff, categories, onBack, onSwipeBack }
           const remaining = new Set(items.filter(item => previous.has(item.id)).map(item => item.id));
           return remaining.size === previous.size ? previous : remaining;
         });
-      }, setLogs, setSettings, fail);
-    } catch {
-      fail();
+      }, stockFailure));
+    } catch (failure) {
+      stockFailure(failure);
     }
-  }, [canAccess, staff.id, retry]);
+    try {
+      subscriptions.push(watchWarehouseOptions(options => {
+        if (!active || denied.current) return;
+        updateCache({ settings: options });
+        setSettings(options);
+        setOptionsConfirmed(true);
+      }, optionsFailure));
+    } catch (failure) {
+      optionsFailure(failure);
+    }
+    const timer = window.setTimeout(() => setSlowSync(true), 4500);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      subscriptions.forEach(stop => stop());
+    };
+  }, [canAccess, staff.id, retry, sessionCache, rejectAccess]);
+
+  useEffect(() => {
+    if (!canAccess || panel !== 'logs') return;
+    const fail = (failure: unknown) => {
+      if (!rejectAccess(failure)) setLogsError(true);
+    };
+    try { return watchWarehouseLogs(items => { if (!denied.current) setLogs(items); }, fail); }
+    catch (failure) { fail(failure); }
+  }, [canAccess, panel, retry, rejectAccess]);
 
   const visibleStock = useMemo(
     () => [...committed, ...(stock ?? [])].filter(item => !hiddenItems.has(item.id)),
@@ -188,11 +257,16 @@ export default function WarehousePage({ staff, categories, onBack, onSwipeBack }
   const category = privateCategories.find(entry => entry.id === categoryId)!;
   const options = settings?.[categoryId] ?? EMPTY_OPTIONS;
   const categoryLogs = logs?.filter(log => log.categoryId === categoryId) ?? [];
-  const ready = Boolean(stock && settings && !loadError);
+  const ready = Boolean(stockConfirmed && optionsConfirmed && !loadError && !optionsError);
+  const packingOptionsFor = (id: string) => {
+    if (!settings || !isWarehouseCategory(id)) return [];
+    const options = settings[id] ?? EMPTY_OPTIONS;
+    return allSizes(id, options).filter(size => !options.disabledSizes.includes(packingKey(size)));
+  };
   const startEditor = (item: WarehouseTile | null) => {
-    if (!settings) return;
+    if (!ready) return;
     setEditor({
-      item, sizes: allSizes(categoryId, options).filter(size => !options.disabledSizes.includes(packingKey(size))),
+      item, sizes: packingOptionsFor(categoryId),
     });
   };
 
@@ -226,7 +300,7 @@ export default function WarehousePage({ staff, categories, onBack, onSwipeBack }
   async function saveItem(tile: Tile) {
     const created = await changeStock(categoryId, staff, editor?.item
       ? { action: 'edit', item: editor.item, tile }
-      : { action: 'add', tile });
+      : { action: 'add', tile, voiceId: editor?.voiceId });
     if (created) {
       // Show the acknowledged write even if the collection listener is behind.
       setStock(previous => previous.items?.some(item => item.id === created.id)
@@ -237,6 +311,17 @@ export default function WarehousePage({ staff, categories, onBack, onSwipeBack }
     }
     setEditor(null);
   }
+
+  const retrySync = () => {
+    denied.current = false;
+    setStockConfirmed(false);
+    setOptionsConfirmed(false);
+    setLoadError(false);
+    setOptionsError(false);
+    setLogsError(false);
+    setSlowSync(false);
+    setRetry(value => value + 1);
+  };
 
   return <section dir="rtl" className="warehouse-page stock-workspace" aria-label={WAREHOUSE_NAME}>
     <button type="button" className="warehouse-back" onClick={onBack}>
@@ -256,27 +341,35 @@ export default function WarehousePage({ staff, categories, onBack, onSwipeBack }
     </div>
     {loadError ? <div className="space-y-2">
       <ActionFeedback tone="error" message="تعذر فتح بيانات مستودع نعيمه. تحقق من الاتصال وصلاحية الحساب." />
-      <button type="button" className="warehouse-button" onClick={() => {
-        setStock(previous => ({ committed: previous.committed }));
-        setSettings(undefined);
-        setLogs(undefined);
-        setLoadError(false);
-        setRetry(value => value + 1);
-      }}>إعادة المحاولة</button>
+      <button type="button" className="warehouse-button" onClick={retrySync}>إعادة المحاولة</button>
     </div> : <>
       <div className="warehouse-panels" role="group" aria-label="عرض المستودع">
         {panels.map(({ id, label, icon: Icon }) => <button key={id} type="button"
-          disabled={id === 'logs' ? !logs : id !== 'stock' && !settings}
           aria-pressed={panel === id} onClick={() => { setPanel(id); setError(''); }}>
           <Icon size={17} aria-hidden="true" />{label}
         </button>)}
       </div>
+      {voiceNotice && <ActionFeedback tone="success" message={voiceNotice} />}
       {error && <ActionFeedback tone="error" message={error} />}
-      {panel === 'sizes' && settings && <WarehouseSizes key={categoryId} category={categoryId} options={options} />}
-      {panel === 'logs' && logs && <LogsView key={categoryId} logs={categoryLogs} tiles={items} categories={privateCategories}
+      {panel === 'sizes' && settings && optionsConfirmed && !optionsError && <WarehouseSizes key={categoryId} category={categoryId} options={options} />}
+      {panel === 'logs' && logs && !logsError && <LogsView key={categoryId} logs={categoryLogs} tiles={items} categories={privateCategories}
         onEditTile={editItem} onOpenReservation={reserveItem} />}
+      {((panel === 'stock' && !stock) ||
+        (panel === 'sizes' && !optionsConfirmed && !optionsError) ||
+        (panel === 'logs' && !logs && !logsError)) && (
+        <p role="status" className="warehouse-sync-note">
+          {panel === 'logs' ? 'جارٍ تحميل الحركات…' : panel === 'sizes' ? 'جارٍ تحميل المقاسات…' : 'جارٍ جلب الأصناف…'}
+        </p>
+      )}
+      {((panel !== 'logs' && optionsError) || (panel === 'logs' && logsError) ||
+        (slowSync && (!stockConfirmed || !optionsConfirmed || (panel === 'logs' && !logs)))) && (
+        <div className="warehouse-sync-note">
+          <span>{optionsError || logsError ? 'تعذّر تحميل هذا الجزء.' : 'المزامنة بتاخذ وقت أطول من المعتاد.'}</span>
+          <button type="button" className="warehouse-button" onClick={retrySync}>إعادة المحاولة</button>
+        </div>
+      )}
       {panel === 'stock' && <InventoryWorkspace category={category} categories={privateCategories} tiles={items}
-        showSummary={false} separatePrint actionsDisabled={!ready} searchQuery={search} onSearchChange={setSearch} searchResetKey={searchResetKey}
+        showSummary={false} separatePrint actionsDisabled={!ready} inventoryActionsDisabled={!stock} searchQuery={search} onSearchChange={setSearch} searchResetKey={searchResetKey}
         onSelectCategory={id => selectCategory(id as WarehouseCategory)} onAdd={() => startEditor(null)}
         onShowAll={() => setFullList(true)} onPrint={() => setPrinting(true)}>
         <TileList key={categoryId} tiles={filtered} loading={!stock} activeCategoryId={categoryId} category={category}
@@ -286,9 +379,30 @@ export default function WarehousePage({ staff, categories, onBack, onSwipeBack }
       {fullList && <FullListModal isOpen mobileSnap="compact" category={category} tiles={items} logs={categoryLogs}
         onClose={() => setFullList(false)} onEdit={editItem} onOpenReservation={reserveItem}
         onViewImage={setImage} onDelete={selectForDeletion} />}
-      {editor && <TileForm activeCategoryId={categoryId} category={category} editingTile={editor.item}
-        canManageVisibility={false} warehouseName={WAREHOUSE_NAME} sizePresets={editor.sizes}
-        onCancel={() => setEditor(null)} onViewImage={setImage} onSave={saveItem} />}
+      {voiceEndpoint && <StockVoiceLauncher userId={staff.id} location="warehouse" ready={ready}
+        suppressed={Boolean(overlaysOpen || voiceOpen || editor || reserving || deleting || image || printing || fullList)}
+        onOpen={() => { setVoiceNotice(""); openVoice(); }} />}
+      {voiceOpen && <React.Suspense fallback={<div role="status" className="voice-loading">جارٍ فتح التسجيل…</div>}>
+        <VoiceAddModal staff={staff} items={visibleStock} categories={privateCategories}
+          categoryId={null} title={`مساعد ${WAREHOUSE_NAME}`} packingOptionsFor={packingOptionsFor}
+          previewItem={previewWarehouseVoiceItem} initialCapture={capture ?? undefined} onClose={closeVoice}
+          onSaved={deleted => {
+            closeVoice();
+            setVoiceNotice(deleted ? "انحذف الصنف من المستودع." : "تعدّل الصنف في المستودع.");
+          }}
+          onContinue={(initialValues, id) => {
+            if (!ready || !isWarehouseCategory(id)) return;
+            closeVoice();
+            selectCategory(id);
+            setPanel('stock');
+            setEditor({ item: null, sizes: packingOptionsFor(id), initialValues, voiceId: `voice_${crypto.randomUUID()}` });
+          }} />
+      </React.Suspense>}
+      {editor && <React.Suspense fallback={<p role="status" className="warehouse-sync-note">جارٍ فتح نموذج الصنف…</p>}>
+      <TileForm activeCategoryId={categoryId} category={category} editingTile={editor.item}
+        canManageVisibility={false} warehouseName={WAREHOUSE_NAME} sizePresets={editor.sizes} initialValues={editor.initialValues}
+        onCancel={() => setEditor(null)} onViewImage={setImage} onSave={saveItem} />
+      </React.Suspense>}
       {reserving && <ReservationModal tile={reserving} onClose={() => setReserving(null)}
         onUpdateReservations={async reservations => {
           await changeStock(categoryId, staff, { action: 'reserve', item: reserving, reservations });
@@ -297,8 +411,10 @@ export default function WarehousePage({ staff, categories, onBack, onSwipeBack }
       {deleting && <ConfirmModal isOpen message={`حذف «${deleting.name}» من ${WAREHOUSE_NAME}؟`}
         onClose={() => setDeleting(null)} onConfirm={() => void deleteItem(deleting)} />}
       {image && <ImageModal src={image} onClose={() => setImage('')} />}
-      {printing && <PrintPdfModal isOpen onClose={() => setPrinting(false)} activeCategoryId={categoryId}
-        categories={privateCategories} allItems={visibleStock} currentStaff={staff} warehouseName={WAREHOUSE_NAME} />}
+      {printing && <React.Suspense fallback={<p role="status" className="warehouse-sync-note">جارٍ فتح خيارات الطباعة…</p>}>
+      <PrintPdfModal isOpen onClose={() => setPrinting(false)} activeCategoryId={categoryId}
+        categories={privateCategories} allItems={visibleStock} currentStaff={staff} warehouseName={WAREHOUSE_NAME} />
+      </React.Suspense>}
     </>}
   </section>;
 }

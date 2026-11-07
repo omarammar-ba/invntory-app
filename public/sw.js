@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'inventory-app-v25-consistent-modules';
+const CACHE_VERSION = 'inventory-app-stock-voice-v6';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {

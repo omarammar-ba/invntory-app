@@ -5,7 +5,7 @@
   --wh-line: #7287a3;
   --wh-divider: #c6d2e0;
   --wh-accent: #154e97;
-  --wh-primary: #1657a5;
+  --wh-primary: #1268da;
   display: grid;
   gap: 1rem;
   max-width: 56rem;
@@ -21,7 +21,7 @@
   --wh-line: #7288a6;
   --wh-divider: #4c607b;
   --wh-accent: #abd0ff;
-  --wh-primary: #235eaa;
+  --wh-primary: #1767d9;
 }
 
 .warehouse-page :is(button, input, select):focus-visible {
@@ -187,4 +187,15 @@
   .warehouse-page .home-event-heading { grid-template-columns: minmax(0, 1fr) auto; gap: 0 .35rem; }
   .warehouse-page .home-event-heading > time { grid-column: 1; grid-row: 2; }
   .warehouse-page .home-event-toggle { grid-column: 2; grid-row: 1 / span 2; }
+}
+
+.warehouse-sync-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding-block: 6px;
+  color: var(--workspace-muted);
+  font-size: .82rem;
 }

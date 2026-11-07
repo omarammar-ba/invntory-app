@@ -9,13 +9,20 @@ import React, {
 import { flushSync } from 'react-dom';
 
 import Header from "@/components/layout/Header";
+import InventoryLaunchSkeleton from "@/components/layout/InventoryLaunchSkeleton";
 import Sidebar from "@/components/layout/Sidebar";
 import BottomNav from "@/components/layout/BottomNav";
 import InventoryWorkspace from "@/features/inventory/InventoryWorkspace";
-import WarehousePage from '@/features/warehouse/WarehousePage';
 import { WAREHOUSE_NAME } from '@/features/warehouse/warehouseName';
+import WarehousePage from '@/features/warehouse/WarehousePage';
+import type { WarehouseSessionCache } from '@/features/warehouse/warehouse.service';
+import { useVoiceLaunch } from '@/features/voice/voice-capture';
+import StockVoiceLauncher from '@/features/voice/StockVoiceLauncher';
+import { voiceEndpoint } from '@/features/voice/voice.service';
 import { useSwipeBack } from '@/hooks/useSwipeBack';
 const BackupModal = React.lazy(() => import('@/features/backup/BackupModal'));
+const TileForm = React.lazy(() => import('@/features/inventory/TileForm'));
+const PrintPdfModal = React.lazy(() => import('@/features/settings/PrintPdfModal'));
 const VoiceAddModal = React.lazy(() => import('@/features/voice/VoiceAddModal'));
 import { orderHomeCategories } from '@/features/dashboard/dashboardModel';
 import {
@@ -36,7 +43,6 @@ import { Login } from "@/features/auth";
 import { Dashboard } from "@/features/dashboard";
 import {
   TileList,
-  TileForm,
   ImageModal,
   ReservationModal,
   FullListModal,
@@ -44,7 +50,7 @@ import {
 } from "@/features/inventory";
 import { CategoryManagerModal, DEFAULT_SHOWER_BOX_FIELDS, categoryService } from "@/features/categories";
 import { StaffManagerModal, staffService } from "@/features/staff";
-import { SettingsModal, PrintPdfModal } from "@/features/settings";
+import SettingsModal from "@/features/settings/SettingsModal";
 import { LogsView } from "@/features/logs";
 
 import {
@@ -337,7 +343,6 @@ const App: React.FC = () => {
 
   const [globalAddCategoryId, setGlobalAddCategoryId] = useState<string | null>(null);
   const [homeInventoryHydrated, setHomeInventoryHydrated] = useState(false);
-  const launchComplete = useRef(false);
 
   const [
     inventoryRefreshVersion,
@@ -492,15 +497,25 @@ const App: React.FC = () => {
   >(null);
 
 
-  const [voiceOpen, setVoiceOpen] = useState(false);
-  const [voiceCategoryId, setVoiceCategoryId] = useState<string | null>(null);
+  const [splashElapsed, setSplashElapsed] = useState(false);
+  const { voiceOpen, capture, openVoice, closeVoice } = useVoiceLaunch();
+  const warehouseCache = useRef<WarehouseSessionCache | null>(null);
+  React.useLayoutEffect(() => {
+    if (currentStaff?.role !== 'admin' || currentStaff.status !== 'active' ||
+        (warehouseCache.current && warehouseCache.current.staffId !== currentStaff.id)) {
+      warehouseCache.current = null;
+    }
+  }, [currentStaff?.id, currentStaff?.role, currentStaff?.status]);
+  const voiceCreateKey = useRef<string | null>(null);
   const [voiceValues, setVoiceValues] = useState<Partial<Tile> | null>(null);
 
   const clearSecuritySensitiveState =
     useCallback(
       () => {
         swipeTrail.current = [];
-        setVoiceOpen(false);
+        closeVoice();
+        warehouseCache.current = null;
+        voiceCreateKey.current = null;
         setVoiceValues(null);
         setPorcelainTiles([]);
         setCeramicTiles([]);
@@ -513,7 +528,7 @@ const App: React.FC = () => {
 
         clearProtectedLocalData();
       },
-      []
+      [closeVoice]
     );
 
 
@@ -529,12 +544,17 @@ const App: React.FC = () => {
     return () => { document.removeEventListener('visibilitychange', syncMotion); document.documentElement.removeAttribute('data-ui-paused'); };
   }, []);
 
+  useEffect(() => {
+    const started = performance.getEntriesByName('inventory-splash-mounted')[0]?.startTime ?? 0;
+    const timer = window.setTimeout(() => setSplashElapsed(true), Math.max(0, started + 2000 - performance.now()));
+    return () => window.clearTimeout(timer);
+  }, []);
+
   React.useLayoutEffect(() => {
-    if (authLoading) return;
-    launchComplete.current = true;
+    if (!splashElapsed) return;
     document.getElementById('app-launch-splash')?.remove();
     document.documentElement.classList.remove('app-launching');
-  }, [authLoading]);
+  }, [splashElapsed]);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -870,8 +890,8 @@ const App: React.FC = () => {
       forcedCategoryId?: string
     ): Tile[] =>
       snapshot.docs.map((document: any) => ({
-        id: document.id,
         ...document.data(),
+        id: document.id,
         ...(forcedCategoryId
           ? { categoryId: forcedCategoryId }
           : {
@@ -2630,7 +2650,7 @@ const App: React.FC = () => {
           false
         );
         setVoiceValues(null);
-        setVoiceOpen(false);
+        closeVoice();
 
         // Opening the general audit-log page from navigation must never keep a
         // model-specific filter from an earlier visit. Item-specific log viewing
@@ -2908,10 +2928,8 @@ const App: React.FC = () => {
     }
   }, [loading, pendingInventoryAction, inventorySyncError]);
 
-  if (authLoading && !launchComplete.current) return null;
-  if (authLoading || !user || !currentStaff) {
-    return <Login />;
-  }
+  if (authLoading) return splashElapsed ? <InventoryLaunchSkeleton /> : null;
+  if (!user || !currentStaff) return <Login />;
 
   return (
     <div
@@ -3131,7 +3149,6 @@ const App: React.FC = () => {
                     }
                     searchInputRef={homeSearchInputRef}
                     onSearchActiveChange={setIsHomeSearching}
-                    onVoiceAdd={() => { setVoiceCategoryId(null); setVoiceOpen(true); }}
                     onEditTile={handleEditClick}
                     onViewModelLogs={handleViewModelLogs}
                     onSelectCategory={
@@ -3160,8 +3177,15 @@ const App: React.FC = () => {
                     }
                   />
                 ) : view === 'warehouse' && currentStaff.role === 'admin' && currentStaff.status === 'active' ? (
-                  <WarehousePage key={currentStaff.id} staff={currentStaff} categories={WAREHOUSE_CATEGORIES}
-                    onBack={() => changeView('dashboard')} onSwipeBack={swipeBlocked ? undefined : goBackBySwipe} />
+                    <WarehousePage
+                      key={currentStaff.id}
+                      staff={currentStaff}
+                      categories={WAREHOUSE_CATEGORIES}
+                      sessionCache={warehouseCache}
+                      onBack={() => changeView('dashboard')}
+                      overlaysOpen={Boolean(swipeBlocked)}
+                      onSwipeBack={swipeBlocked ? undefined : goBackBySwipe}
+                    />
                 ) : view ===
                   'inventory' ? (
                   <InventoryWorkspace
@@ -3174,7 +3198,6 @@ const App: React.FC = () => {
                     onShowAll={() => setIsFullListModalOpen(true)}
                     onPrint={openPrintReport}
                     userId={currentStaff?.id}
-                    onVoiceAdd={() => { setVoiceCategoryId(activeCategoryId); setVoiceOpen(true); }}
                     onAdd={() => { setVoiceValues(null); setAddItemSource('category'); setIsAddingNew(true); }}
                     onManageCategories={isEmployee ? undefined : () => {
                       setEditingCategoryModalId(null); setIsCategoryModalOpen(true);
@@ -3390,12 +3413,37 @@ const App: React.FC = () => {
         </ElasticScroll>
       </div>
 
-      {voiceOpen && <React.Suspense fallback={<div role="status" className="voice-loading">جارٍ فتح التسجيل…</div>}><VoiceAddModal userId={currentStaff?.id} key={currentStaff?.id} categories={categories.filter(c => !isEmployee || c.visibleToEmployees === true)} categoryId={voiceCategoryId} onClose={() => setVoiceOpen(false)} onContinue={(values, categoryId) => {
-        const category = categories.find(c => c.id === categoryId);
-        if (!category || !currentStaff || currentStaff.status !== 'active' || (isEmployee && category.visibleToEmployees !== true)) { setVoiceOpen(false); return; }
-        setVoiceOpen(false); setEditingTile(null); setVoiceValues(values); setGlobalAddCategoryId(categoryId); setActiveCategoryId(categoryId); setAddItemSource('global'); setIsTileFormClosing(false); setIsAddingNew(true);
-      }} /></React.Suspense>}
+      {voiceEndpoint && currentStaff.status === 'active' &&
+        (view === 'dashboard' || view === 'inventory') &&
+        <StockVoiceLauncher userId={currentStaff.id} suppressed={Boolean(swipeBlocked)}
+          ready={Boolean(categoriesReady && homeInventoryHydrated && !inventorySyncError)}
+          onOpen={openVoice} />}
+      {voiceOpen && currentStaff.status === 'active' && <React.Suspense fallback={<div role="status" className="voice-loading">جارٍ فتح التسجيل…</div>}>
+        <VoiceAddModal staff={currentStaff} key={currentStaff.id} items={allItemsCombined}
+          categories={categories.filter(c => !isEmployee || c.visibleToEmployees === true)}
+          categoryId={null} initialCapture={capture ?? undefined} onClose={closeVoice}
+          onSaved={deleted => {
+            closeVoice();
+            setInventoryRefreshVersion(previous => previous + 1);
+            setActionNotice(deleted ? 'تم حذف الصنف بعد التأكيد.' : 'تم تعديل الصنف بعد التأكيد.');
+          }}
+          onContinue={(values, categoryId) => {
+            const category = categories.find(c => c.id === categoryId);
+            if (!category || currentStaff.status !== 'active' || (isEmployee && category.visibleToEmployees !== true)) return;
+            voiceCreateKey.current = `voice_${crypto.randomUUID()}`;
+            closeVoice();
+            setEditingTile(null);
+            setVoiceValues(values);
+            setGlobalAddCategoryId(categoryId);
+            setActiveCategoryId(categoryId);
+            setAddItemSource('global');
+            setIsTileFormClosing(false);
+            setIsAddingNew(true);
+          }}
+        />
+      </React.Suspense>}
       {(isAddingNew || editingTile) && (
+        <React.Suspense fallback={<div role="status" className="voice-loading">جارٍ فتح نموذج الصنف…</div>}>
         <TileForm
           open={!isTileFormClosing}
           onExited={() => {
@@ -3404,7 +3452,16 @@ const App: React.FC = () => {
             setIsTileFormClosing(false);
             setVoiceValues(null);
           }}
-          onSave={handleSaveTile}
+          onSave={voiceValues && !editingTile ? async (data: Omit<Tile, 'id'>) => {
+            const category = categories.find(c => c.id === data.categoryId);
+            const id = voiceCreateKey.current;
+            if (!category || !id) throw new Error('أعد فتح نموذج الإضافة لاختيار القسم.');
+            const { saveVoiceAddition } = await import('@/features/voice/stock-command.service');
+            await saveVoiceAddition(id, data, category, currentStaff);
+            setIsTileFormClosing(true);
+            setInventoryRefreshVersion(previous => previous + 1);
+            setActionNotice('تمت إضافة الصنف بعد التأكيد.');
+          } : handleSaveTile}
           editingTile={editingTile}
           initialValues={voiceValues}
           onCancel={() => setIsTileFormClosing(true)}
@@ -3423,6 +3480,7 @@ const App: React.FC = () => {
           allowCategorySwitch={!editingTile && addItemSource === 'global'}
           canManageVisibility={!isEmployee}
         />
+        </React.Suspense>
       )}
 
       {view !== 'warehouse' && <BottomNav
@@ -3516,6 +3574,7 @@ const App: React.FC = () => {
       )}
 
       {isPrintPdfModalOpen && (
+        <React.Suspense fallback={<div role="status" className="voice-loading">جارٍ فتح خيارات الطباعة…</div>}>
         <PrintPdfModal
           isOpen={
             isPrintPdfModalOpen
@@ -3538,6 +3597,7 @@ const App: React.FC = () => {
             currentStaff
           }
         />
+        </React.Suspense>
       )}
 
       {isSettingsModalOpen && (

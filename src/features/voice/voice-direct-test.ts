@@ -1,4 +1,13 @@
 // Temporary, explicitly enabled browser-only test. The API key is PUBLIC in the built app.
+import {
+  stockCommandSchema,
+  stockCommandPrompt,
+  parseStockCommand,
+  parseStockEditFollowup,
+  stockEditContextPrompt,
+  stockShortcut,
+} from "../../../voice-api/src/stock-command.mjs";
+import type { StockAnalysis, StockCommand } from "./stock-command.types";
 import type { Category } from "@/types";
 import type {
   VoiceAnalysis,
@@ -6,12 +15,23 @@ import type {
   VoiceProgress,
 } from "./voice.service";
 import { publishVoiceUsage, quotaFromHeaders } from "./voice-quota";
-import {
-  schema,
-  system,
-  cleanDraft,
-} from "./voice-model.mjs";
-import { transcriptionHint } from "./voice-transcription.mjs";
+import { schema, system, cleanDraft } from "./voice-model.mjs";
+import { inventoryTranscriptionHint, prepareInventoryTranscript, preserveExplicitStockCode } from "../../../voice-api/src/inventory-transcript.mjs";
+type DirectOptions = [
+  audio: Blob | string,
+  categories: Category[],
+  lockedCategoryId: string | null,
+  key: string,
+  signal: AbortSignal,
+  correctionField?: VoiceCorrectionField,
+  onProgress?: (progress: VoiceProgress) => void,
+];
+export function analyzeDirectTest(
+  ...args: DirectOptions
+): Promise<VoiceAnalysis>;
+export function analyzeDirectTest(
+  ...args: [...DirectOptions, stockCommand: true, editTarget?: string]
+): Promise<StockAnalysis>;
 export async function analyzeDirectTest(
   audio: Blob | string,
   categories: Category[],
@@ -20,7 +40,9 @@ export async function analyzeDirectTest(
   signal: AbortSignal,
   correctionField?: VoiceCorrectionField,
   onProgress?: (progress: VoiceProgress) => void,
-): Promise<VoiceAnalysis> {
+  stockCommand = false,
+  editTarget?: string,
+): Promise<VoiceAnalysis | StockAnalysis> {
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
   if (
     typeof audio !== "string" &&
@@ -72,10 +94,9 @@ export async function analyzeDirectTest(
       audio.type.includes("mp4") ? "voice.m4a" : "voice.webm",
     );
     file.append("model", "whisper-large-v3");
-    file.append("language", "ar");
     file.append("temperature", "0");
     file.append("response_format", "json");
-    file.append("prompt", transcriptionHint);
+    file.append("prompt", inventoryTranscriptionHint);
     const stt = await request("audio/transcriptions", file);
     transcript = typeof stt.text === "string" ? stt.text.trim() : "";
     if (!transcript || transcript.length > 4000)
@@ -83,12 +104,17 @@ export async function analyzeDirectTest(
   }
   if (!transcript || transcript.length > 4000)
     throw new Error("راجع النص قبل التحليل.");
+  transcript = prepareInventoryTranscript(transcript);
   onProgress?.({ phase: "extracting", transcript });
   const list = categories.map((c) => ({
     id: c.id,
     name: c.name,
     unit: c.defaultUnit || "meters",
   }));
+  if (stockCommand && !editTarget) {
+    const shortcut = stockShortcut(transcript, list, lockedCategoryId);
+    if (shortcut) return { transcript, command: shortcut as StockCommand };
+  }
   const completion = await request(
     "chat/completions",
     {
@@ -98,11 +124,12 @@ export async function analyzeDirectTest(
       messages: [
         {
           role: "system",
-          content:
-            system +
-            (correctionField
-              ? ` هذا تسجيل تصحيح للحقل ${correctionField} فقط. فسّر الكلام باعتباره قيمة هذا الحقل، ولا تطلب بقية بيانات الصنف ولا تستنتجها.`
-              : ""),
+          content: stockCommand
+            ? stockCommandPrompt + (editTarget ? `\n${stockEditContextPrompt}` : "")
+            : system +
+              (correctionField
+                ? ` هذا تسجيل تصحيح للحقل ${correctionField} فقط. فسّر الكلام باعتباره قيمة هذا الحقل، ولا تطلب بقية بيانات الصنف ولا تستنتجها.`
+                : ""),
         },
         {
           role: "user",
@@ -110,12 +137,19 @@ export async function analyzeDirectTest(
             transcript,
             categories: list,
             lockedCategoryId,
+            editTarget,
           }),
         },
       ],
       response_format: {
         type: "json_schema",
-        json_schema: { name: "inventory_voice_draft", strict: true, schema },
+        json_schema: {
+          name: stockCommand
+            ? "inventory_stock_command"
+            : "inventory_voice_draft",
+          strict: true,
+          schema: stockCommand ? stockCommandSchema : schema,
+        },
       },
     },
     true,
@@ -126,6 +160,15 @@ export async function analyzeDirectTest(
   } catch {
     throw new Error("نتيجة التحليل غير مكتملة. أعد التسجيل.");
   }
+  if (stockCommand)
+    return {
+      transcript,
+      command: (editTarget && lockedCategoryId ? parseStockEditFollowup(parsed, transcript, list, lockedCategoryId, editTarget) : parseStockCommand(
+        preserveExplicitStockCode(parsed, transcript),
+        list,
+        lockedCategoryId,
+      )) as StockCommand,
+    };
   return {
     transcript,
     draft: cleanDraft(

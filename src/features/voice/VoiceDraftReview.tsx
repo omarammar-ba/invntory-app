@@ -1,6 +1,6 @@
 import React from "react";
 import { Camera, ImagePlus, Mic, X } from "lucide-react";
-import type { Category } from "@/types";
+import type { Category, PackingOption } from "@/types";
 import type {
   VoiceAnalysis,
   VoiceCorrectionField,
@@ -12,14 +12,16 @@ import {
   quantitySource,
   quantityUnitLabel,
 } from "./voice-quantity.mjs";
-import { presetsFor, resolvePreset } from "./voice-presets.mjs";
+import { resolvePreset, voicePackingKey } from "./voice-presets.mjs";
 
 type Props = {
   analysis: VoiceAnalysis;
   categories: Category[];
   selectedCategory: string;
+  categoryQuestion: string;
   locked: boolean;
   packingChoice: string;
+  packingOptions: PackingOption[];
   photo: string;
   busy: boolean;
   heardText: string;
@@ -41,8 +43,8 @@ export default function VoiceDraftReview(props: Props) {
   const draft = analysis.draft;
   const category = categories.find((c) => c.id === selectedCategory);
   const preset = packingChoice
-    ? presetsFor(selectedCategory).find((p) => p.desc === packingChoice)
-    : resolvePreset(draft, selectedCategory);
+    ? props.packingOptions.find((p) => voicePackingKey(p) === packingChoice)
+    : resolvePreset(draft, selectedCategory, "", props.packingOptions);
   const quantities = convertQuantity(
     draft,
     preset,
@@ -74,6 +76,14 @@ export default function VoiceDraftReview(props: Props) {
           ))}
         </select>
       </label>
+      {props.categoryQuestion && (
+        <div className="voice-warning">
+          <p role="status">{props.categoryQuestion}</p>
+          <button type="button" className="stock-voice-quiet" disabled={busy} onClick={() => props.onCorrect("size")}>
+            <Mic size={17} aria-hidden="true" /> وضّح النوع بالصوت
+          </button>
+        </div>
+      )}
       <div className="voice-calculated voice-packing" aria-live="polite">
         {quantities.error ? (
           <p className="voice-warning">{quantities.error}</p>
@@ -197,19 +207,19 @@ export default function VoiceDraftReview(props: Props) {
           <option value="pieces">قطع</option>
         </select>
       </div>
-      {presetsFor(selectedCategory).length > 0 && (
+      {props.packingOptions.length > 0 && (
         <label className="voice-category">
           تعبئة المقاس
           <select
             aria-label="تعبئة المقاس"
             disabled={busy}
-            value={preset?.desc || ""}
+            value={preset ? voicePackingKey(preset) : ""}
             onChange={(e) => props.onPacking(e.target.value)}
           >
             <option value="">اختر التعبئة للحساب</option>
-            {presetsFor(selectedCategory).map((p) => (
-              <option key={p.desc} value={p.desc}>
-                {p.label}
+            {props.packingOptions.map((p) => (
+              <option key={voicePackingKey(p)} value={voicePackingKey(p)}>
+                {p.label}{p.quality ? ` · ${p.quality}` : ""}
               </option>
             ))}
           </select>

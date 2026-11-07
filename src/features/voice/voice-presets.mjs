@@ -67,21 +67,31 @@ const normalize = (s) =>
     .replace(/[×xX]/g, "*")
     .replace(/\s/g, "")
     .toLowerCase();
-export function resolvePreset(draft, id, transcript = "") {
-  const presets = presetsFor(id);
+export const voicePackingKey = (option) =>
+  option.quality ? JSON.stringify([option.desc, option.quality]) : option.desc;
+
+export function resolvePreset(draft, id, transcript = "", presets = presetsFor(id)) {
   const size = normalize(draft.size);
-  const exact = presets.find((p) => normalize(p.desc) === size);
-  if (exact) return exact;
+  const exact = presets.filter((p) => normalize(p.desc) === size);
+  if (exact.length === 1 && !exact[0].quality) return exact[0];
+  const quality = normalize(draft.quality);
+  const withQuality = (p) => !p.quality || normalize(p.quality) === quality;
+  if (exact.length > 1 || exact.some((p) => p.quality)) {
+    const matchingQuality = exact.filter((p) => p.quality && withQuality(p));
+    return matchingQuality.length === 1 ? matchingQuality[0] : null;
+  }
   const dimensions = size.match(/\d+(?:\.\d+)?\*\d+(?:\.\d+)?/)?.[0];
-  const candidates = presets.filter(
-    (p) => normalize(p.desc.split(" - ")[0]) === dimensions,
-  );
-  if (candidates.length === 1) return candidates[0];
+  const reversed = dimensions?.split("*").reverse().join("*");
+  const candidates = presets.filter((p) => {
+    const configured = normalize(p.desc.split(" - ")[0]);
+    return configured === dimensions || configured === reversed;
+  });
+  if (candidates.length === 1 && withQuality(candidates[0])) return candidates[0];
   const hint = normalize(
     [draft.size, draft.brand, transcript].filter(Boolean).join(" "),
   );
   const specified = candidates.filter((p) =>
-    p.desc
+    withQuality(p) && p.desc
       .split(" - ")
       .slice(1)
       .every((part) => hint.includes(normalize(part))),
@@ -89,10 +99,10 @@ export function resolvePreset(draft, id, transcript = "") {
   if (specified.length === 1) return specified[0];
   return null; // Same dimensions can have different real packaging. Never choose the first one.
 }
-export function packingValues(draft, id, choice = "") {
+export function packingValues(draft, id, choice = "", presets = presetsFor(id)) {
   const preset = choice
-    ? presetsFor(id).find((p) => p.desc === choice)
-    : resolvePreset(draft, id);
+    ? presets.find((p) => voicePackingKey(p) === choice)
+    : resolvePreset(draft, id, "", presets);
   const converted = convertQuantity(draft, preset);
   if (!preset || converted.error || converted.meters === null) return null;
   return {

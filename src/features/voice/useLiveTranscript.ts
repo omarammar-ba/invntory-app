@@ -1,18 +1,41 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isAppleMobile } from "./voice-capture";
+import { prepareInventoryTranscript } from "../../../voice-api/src/inventory-transcript.mjs";
+
+type Result = { isFinal: boolean; 0?: { transcript?: string } };
+type SpeechSession = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: { results: ArrayLike<Result> }) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: (track?: MediaStreamTrack) => void;
+  abort: () => void;
+};
+type SpeechConstructor = { new (): SpeechSession; prototype: SpeechSession };
+const browser = window as Window & {
+  SpeechRecognition?: SpeechConstructor;
+  webkitSpeechRecognition?: SpeechConstructor;
+};
+
+function joinTranscript(prefix: string, segment: string) {
+  const earlier = prefix.split(/\s+/).filter(Boolean);
+  const next = segment.split(/\s+/).filter(Boolean);
+  let overlap = Math.min(earlier.length, next.length);
+  while (overlap && earlier.slice(-overlap).join(" ") !== next.slice(0, overlap).join(" ")) overlap--;
+  return [...earlier, ...next.slice(overlap)].join(" ");
+}
 
 // This is the browser's speech service, not a promised Google Cloud connection.
 export function useLiveTranscript() {
-  const recognition = useRef<any>(null);
+  const recognition = useRef<SpeechSession | null>(null);
   const generation = useRef(0);
   const textRef = useRef("");
   const restartTimer = useRef<ReturnType<typeof setTimeout>>();
   const [text, setText] = useState("");
   const [available, setAvailable] = useState(false);
-  const [status, setStatus] = useState("");
-  const supported = Boolean(
-    (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition,
-  );
 
   const stop = useCallback(() => {
     generation.current++;
@@ -22,9 +45,7 @@ export function useLiveTranscript() {
     if (current) {
       current.onresult =
         current.onerror =
-        current.onend =
-        current.onstart =
-          null;
+        current.onend = null;
       try {
         current.abort();
       } catch {
@@ -35,27 +56,24 @@ export function useLiveTranscript() {
     return textRef.current;
   }, []);
 
-  const start = useCallback(() => {
+  const start = useCallback((track: MediaStreamTrack) => {
     stop();
     textRef.current = "";
     setText("");
     setAvailable(false);
-    setStatus("");
-    const Constructor =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-    if (!Constructor) {
-      setStatus(
-        "المعاينة المباشرة غير مدعومة هنا. سيظهر نص التسجيل بعد إنهائه.",
-      );
-      return;
-    }
+    const Constructor = browser.SpeechRecognition || browser.webkitSpeechRecognition;
+    // iPhone/iPad recognition can open a second native microphone session.
+    // Keep MediaRecorder as the sole owner there; transcribe the file on stop.
+    if (!Constructor || isAppleMobile()) return;
+    // Where supported, read the existing recording track. Older engines accept
+    // only start(); the preview remains optional and cannot cancel recording.
+    const sharedTrack = "processLocally" in Constructor.prototype;
     const id = generation.current;
     let prefix = "",
       restarts = 0,
       fatal = false;
     const launch = () => {
-      if (id !== generation.current || document.hidden) return;
+      if (id !== generation.current || document.hidden || track.readyState !== "live") return;
       try {
         const current = new Constructor();
         recognition.current = current;
@@ -64,10 +82,7 @@ export function useLiveTranscript() {
         current.interimResults = true;
         current.maxAlternatives = 1;
         let finalPart = "";
-        current.onstart = () => {
-          if (id === generation.current) setStatus("");
-        };
-        current.onresult = (event: any) => {
+        current.onresult = (event) => {
           if (id !== generation.current) return;
           const all: string[] = [],
             final: string[] = [];
@@ -81,15 +96,11 @@ export function useLiveTranscript() {
             }
           }
           finalPart = final.join(" ");
-          textRef.current = [prefix, ...all]
-            .filter(Boolean)
-            .join(" ")
-            .slice(0, 4000);
+          textRef.current = prepareInventoryTranscript(joinTranscript(prefix, all.join(" "))).slice(0, 4000);
           setText(textRef.current);
           setAvailable(true);
-          setStatus("");
         };
-        current.onerror = (event: any) => {
+        current.onerror = (event) => {
           if (id !== generation.current) return;
           fatal = [
             "not-allowed",
@@ -99,23 +110,24 @@ export function useLiveTranscript() {
             "language-not-supported",
           ].includes(event.error);
           setAvailable(false);
-          setStatus(
-            fatal
-              ? "المعاينة المباشرة غير متاحة. التسجيل مستمر، وسيظهر نصّه بعد إنهائه."
-              : "بانتظار الكلام…",
-          );
         };
         current.onend = () => {
           if (id !== generation.current) return;
           setAvailable(false);
-          prefix = [prefix, finalPart].filter(Boolean).join(" ");
+          prefix = joinTranscript(prefix, finalPart);
           if (!fatal && restarts++ < 3)
             restartTimer.current = setTimeout(launch, 300);
-          else setStatus("انتهت المعاينة المباشرة. التسجيل مستمر.");
         };
-        current.start();
+        if (sharedTrack) {
+          try { current.start(track); }
+          catch (error) {
+            if (!(error instanceof TypeError) &&
+                !(error instanceof DOMException && error.name === "NotSupportedError")) throw error;
+            current.start();
+          }
+        } else current.start();
       } catch {
-        setStatus("تعذرت المعاينة المباشرة. التسجيل مستمر.");
+        setAvailable(false);
       }
     };
     launch();
@@ -129,8 +141,6 @@ export function useLiveTranscript() {
   return {
     text,
     available,
-    supported,
-    status,
     start,
     stop,
     snapshot: () => textRef.current,

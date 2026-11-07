@@ -27,6 +27,7 @@ interface Props {
   onManageCategories?: () => void;
   showSummary?: boolean;
   actionsDisabled?: boolean;
+  inventoryActionsDisabled?: boolean;
   searchResetKey?: number;
   separatePrint?: boolean;
   children: React.ReactNode;
@@ -47,6 +48,7 @@ export default function InventoryWorkspace({
   userId,
   showSummary = true,
   actionsDisabled = false,
+  inventoryActionsDisabled = actionsDisabled,
   searchResetKey,
   separatePrint = false,
   children,
@@ -94,7 +96,7 @@ export default function InventoryWorkspace({
             <Plus size={23} strokeWidth={1.7} aria-hidden="true" />
           </button>
           <button type="button" className="stock-print-button" aria-label="طباعة وتصدير"
-            title="طباعة وتصدير" disabled={actionsDisabled} onClick={onPrint}>
+            title="طباعة وتصدير" disabled={inventoryActionsDisabled} onClick={onPrint}>
             <Printer size={20} strokeWidth={1.7} aria-hidden="true" />
           </button>
         </> : <details
@@ -116,11 +118,11 @@ export default function InventoryWorkspace({
               <Plus size={18} />
               إضافة صنف لهذا القسم
             </button>
-            <button type="button" disabled={actionsDisabled} onClick={() => run(onShowAll)}>
+            <button type="button" disabled={inventoryActionsDisabled} onClick={() => run(onShowAll)}>
               <List size={18} />
               عرض المخزون الكامل
             </button>
-            <button type="button" disabled={actionsDisabled} onClick={() => run(onPrint)}>
+            <button type="button" disabled={inventoryActionsDisabled} onClick={() => run(onPrint)}>
               <Printer size={18} />
               طباعة وتصدير
             </button>
@@ -141,7 +143,7 @@ export default function InventoryWorkspace({
           <MoveHorizontal size={15} strokeWidth={1.5} />
           اسحب الصنف لإظهار الإجراءات
         </span>
-        <button type="button" disabled={actionsDisabled} onClick={onShowAll}>
+        <button type="button" disabled={inventoryActionsDisabled} onClick={onShowAll}>
           عرض الكل
           <ChevronLeft size={15} />
         </button>

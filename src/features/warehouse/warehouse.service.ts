@@ -1,9 +1,12 @@
-import { collection, doc, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, type DocumentData, type Query, type QueryDocumentSnapshot } from 'firebase/firestore';
-import { requireFirestore, sanitizeFirestoreData } from '@/services/firebase/firebase.client';
+import { collection, doc, getDocFromServer, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, type DocumentData, type Query, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { auth, requireFirestore, sanitizeFirestoreData } from '@/services/firebase/firebase.client';
 import { normalizeSize } from '@/features/dashboard/dashboardModel';
 import { calculateReservedQuantity } from '@/features/inventory/inventoryCalculations';
-import { CERAMIC_PRESETS, PORCELAIN_PRESETS } from '@/features/voice/voice-presets.mjs';
-import type { LogEntry, PackingOption, Reservation, StaffMember, Tile } from '@/types';
+import { CERAMIC_PRESETS, PORCELAIN_PRESETS, voicePackingKey } from '@/features/voice/voice-presets.mjs';
+import { stockFingerprint, stockPlan } from '@/features/voice/stock-command-plan.mjs';
+import type { VoiceItemReview } from '@/features/voice/stock-command.service';
+import type { StockCommand } from '@/features/voice/stock-command.types';
+import type { Category, LogEntry, PackingOption, Reservation, StaffMember, Tile } from '@/types';
 import { WAREHOUSE_NAME } from './warehouseName';
 
 export type WarehouseCategory = 'tiles' | 'ceramics';
@@ -17,8 +20,48 @@ export function allSizes(category: WarehouseCategory, options: WarehouseOptions)
   return [...(category === 'tiles' ? PORCELAIN_PRESETS : CERAMIC_PRESETS), ...options.sizes];
 }
 
-export function packingKey(option: PackingOption) {
-  return option.quality ? JSON.stringify([option.desc, option.quality]) : option.desc;
+export const packingKey = voicePackingKey;
+
+export const isWarehouseCategory = (id: string): id is WarehouseCategory =>
+  id === 'tiles' || id === 'ceramics';
+
+function assertWarehouseActor(staff: StaffMember) {
+  if (auth.currentUser?.uid !== staff.id || staff.role !== 'admin' || staff.status !== 'active') {
+    throw new Error('جلسة المستودع غير صالحة لهذا الأمر.');
+  }
+}
+
+export async function previewWarehouseVoiceItem(
+  candidate: Tile, command: StockCommand, category: Category, staff: StaffMember,
+): Promise<VoiceItemReview> {
+  assertWarehouseActor(staff);
+  const categoryId = category.id;
+  if (!isWarehouseCategory(categoryId) || candidate.categoryId !== categoryId ||
+      (command.categoryId && command.categoryId !== categoryId) ||
+      !candidate.id || candidate.id.includes('/') || candidate.id === '.' || candidate.id === '..') {
+    throw new Error('الصنف غير متاح في قسم المستودع.');
+  }
+  const firestore = requireFirestore();
+  const snapshot = await getDocFromServer(doc(firestore, WAREHOUSE_PATH, 'stock', candidate.id));
+  const raw = snapshot.data();
+  if (!raw || raw.categoryId !== categoryId || raw.name !== candidate.name) {
+    throw new Error('الصنف تغيّر أو لم يعد موجوداً. أعد البحث عنه.');
+  }
+  const item = { ...raw, id: snapshot.id } as WarehouseTile;
+  const fingerprint = stockFingerprint(raw);
+  const plan = stockPlan(item, command, category);
+  let attempted = false;
+  return {
+    item, plan,
+    async commit() {
+      assertWarehouseActor(staff);
+      if (attempted) throw new Error('سبق إرسال هذا التأكيد. راجع المستودع قبل إعادة الأمر.');
+      attempted = true;
+      await changeStock(categoryId, staff, plan.action === 'delete'
+        ? { action: 'delete', item, fingerprint }
+        : { action: 'edit', item, tile: { ...item, ...plan.patch }, fingerprint });
+    },
+  };
 }
 
 type OptionChange = { size: PackingOption } | { toggleSize: string };
@@ -55,46 +98,59 @@ export async function saveOptions(category: WarehouseCategory, change: OptionCha
   });
 }
 
-export function watchWarehouse(
-  receiveStock: (items: WarehouseTile[]) => void,
-  receiveLogs: (logs: LogEntry[]) => void,
-  receiveOptions: (options: Partial<Record<WarehouseCategory, WarehouseOptions>>) => void,
-  onError: () => void,
+type WarehouseSettings = Partial<Record<WarehouseCategory, WarehouseOptions>>;
+export type WarehouseSessionCache = {
+  staffId: string;
+  stock?: WarehouseTile[];
+  settings?: WarehouseSettings;
+};
+
+function warehouseCollection(name: string) {
+  return collection(requireFirestore(), WAREHOUSE_PATH, name);
+}
+
+function listenVerified(
+  source: Query<DocumentData>,
+  receive: (docs: QueryDocumentSnapshot<DocumentData>[]) => void,
+  onError: (error: unknown) => void,
 ) {
-  const firestore = requireFirestore();
-  const path = (name: string) => collection(firestore, WAREHOUSE_PATH, name);
-  // Check authorization before exposing data, and skip repeated metadata-only events.
-  const listen = (source: Query<DocumentData>, receive: (docs: QueryDocumentSnapshot<DocumentData>[]) => void) => {
-    let authorized = false;
-    return onSnapshot(source, { includeMetadataChanges: true }, snapshot => {
-      if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) {
-        // The next server snapshot may contain changes represented only by metadata.
-        authorized = false;
-        return;
-      }
-      if (authorized && snapshot.docChanges().length === 0) return;
-      authorized = true;
-      receive(snapshot.docs);
-    }, onError);
-  };
-  const stock = listen(path('stock'), docs => receiveStock(docs.map(entry => ({ ...entry.data(), id: entry.id } as WarehouseTile))));
-  const logs = listen(query(path('logs'), orderBy('timestamp', 'desc'), limit(100)), docs =>
-    receiveLogs(docs.map(entry => ({ ...entry.data(), id: entry.id } as LogEntry))));
-  const options = listen(path('options'), docs =>
-    receiveOptions(Object.fromEntries(docs.map(entry => [entry.id, entry.data()])) as Partial<Record<WarehouseCategory, WarehouseOptions>>));
-  return () => { stock(); logs(); options(); };
+  let serverConfirmed = false;
+  return onSnapshot(source, { includeMetadataChanges: true }, snapshot => {
+    if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites) {
+      serverConfirmed = false;
+      return;
+    }
+    if (serverConfirmed && snapshot.docChanges().length === 0) return;
+    serverConfirmed = true;
+    receive(snapshot.docs);
+  }, onError);
+}
+
+export function watchWarehouseStock(receive: (items: WarehouseTile[]) => void, onError: (error: unknown) => void) {
+  return listenVerified(warehouseCollection('stock'), docs =>
+    receive(docs.map(entry => ({ ...entry.data(), id: entry.id } as WarehouseTile))), onError);
+}
+
+export function watchWarehouseOptions(receive: (settings: WarehouseSettings) => void, onError: (error: unknown) => void) {
+  return listenVerified(warehouseCollection('options'), docs =>
+    receive(Object.fromEntries(docs.map(entry => [entry.id, entry.data()])) as WarehouseSettings), onError);
+}
+
+export function watchWarehouseLogs(receive: (logs: LogEntry[]) => void, onError: (error: unknown) => void) {
+  return listenVerified(query(warehouseCollection('logs'), orderBy('timestamp', 'desc'), limit(100)), docs =>
+    receive(docs.map(entry => ({ ...entry.data(), id: entry.id } as LogEntry))), onError);
 }
 
 type StockChange =
-  | { action: 'add'; tile: Tile }
-  | { action: 'edit'; item: WarehouseTile; tile: Tile }
+  | { action: 'add'; tile: Tile; voiceId?: string }
+  | { action: 'edit'; item: WarehouseTile; tile: Tile; fingerprint?: string }
   | { action: 'reserve'; item: WarehouseTile; reservations: Reservation[] }
-  | { action: 'delete'; item: WarehouseTile };
+  | { action: 'delete'; item: WarehouseTile; fingerprint?: string };
 
 export async function changeStock(category: WarehouseCategory, staff: StaffMember, change: StockChange) {
   const firestore = requireFirestore();
   const stock = collection(firestore, WAREHOUSE_PATH, 'stock');
-  const reference = change.action === 'add' ? doc(stock) : doc(stock, change.item.id);
+  const reference = change.action === 'add' ? (change.voiceId ? doc(stock, change.voiceId) : doc(stock)) : doc(stock, change.item.id);
   const log = doc(collection(firestore, WAREHOUSE_PATH, 'logs'));
   const addedItem: WarehouseTile | undefined = change.action === 'add' ? {
     ...change.tile, id: reference.id, categoryId: category, revision: 1,
@@ -102,10 +158,20 @@ export async function changeStock(category: WarehouseCategory, staff: StaffMembe
   } : undefined;
 
   await runTransaction(firestore, async transaction => {
+    if (change.action === 'add' && change.voiceId) {
+      assertWarehouseActor(staff);
+      if ((await transaction.get(reference)).exists()) throw new Error('هذا الصنف أُضيف بهذا التأكيد. راجع قائمة المستودع.');
+    }
     let current: WarehouseTile | undefined;
     if (change.action !== 'add') {
       const snapshot = await transaction.get(reference);
       current = snapshot.data() as WarehouseTile | undefined;
+      if ('fingerprint' in change && change.fingerprint) {
+        assertWarehouseActor(staff);
+        if (!current || stockFingerprint(current) !== change.fingerprint) {
+          throw new Error('بيانات الصنف تغيّرت بعد المعاينة. أعد البحث وراجع التغيير.');
+        }
+      }
       if (!current || current.categoryId !== category || current.revision !== change.item.revision) {
         throw new Error('الصنف تغيّر. افتحه من جديد قبل متابعة التعديل.');
       }

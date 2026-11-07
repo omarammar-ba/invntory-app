@@ -6,6 +6,7 @@
 @import "./styles/dark.css";
 @import "./styles/voice.css";
 @import "./styles/materials.css";
+@import "./styles/stock-voice.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

@@ -626,9 +626,15 @@ const TileForm:
           );
         }
 
-        if (editingTile?.packing && sizePresets) {
+        const matchesSeedSize = (preset: PackingOption) =>
+          preset.desc === seed.size &&
+          (!sizePresets || Boolean(editingTile) ||
+            (sizePresets.filter(option => option.desc === seed.size).length === 1 &&
+              (!preset.quality || preset.quality === seed.quality)));
+
+        if (seed.packing && sizePresets) {
           const presets = isPorcelain ? porcelainPresets : ceramicPresets;
-          const { mBox, bPallet } = editingTile.packing;
+          const { mBox, bPallet } = seed.packing;
           const index = presets.findIndex(preset =>
             preset.desc === seed.size && preset.mBox === mBox && preset.bPallet === bPallet,
           );
@@ -640,11 +646,7 @@ const TileForm:
           isPorcelain
         ) {
           const presetIndex =
-            porcelainPresets.findIndex(
-              preset =>
-                preset.desc ===
-                seed.size,
-            );
+            porcelainPresets.findIndex(matchesSeedSize);
 
           if (
             presetIndex >=
@@ -679,11 +681,7 @@ const TileForm:
           isCeramic
         ) {
           const presetIndex =
-            ceramicPresets.findIndex(
-              preset =>
-                preset.desc ===
-                seed.size,
-            );
+            ceramicPresets.findIndex(matchesSeedSize);
 
           if (
             presetIndex >=

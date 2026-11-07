@@ -5,8 +5,8 @@ const shownThisSession = new Set<string>();
 interface Target { x: number; y: number; width: number; height: number; radius: number; messageTop: number; messageLeft: number; messageWidth: number; messageMaxHeight: number; above: boolean; }
 
 /** A dismissible first-use spotlight. It never submits a search or opens the keyboard. */
-export default function SearchCoachmark({ searchRef, targetRef, active, userId = 'local', storagePrefix = 'inventory-search-spotlight-v2', title = 'يمكنك البحث هنا', description = 'ابحث عن أي صنف بالاسم، الرقم، الكود أو المقاس.' }: {
-  searchRef?: React.RefObject<HTMLInputElement>; targetRef?: React.RefObject<HTMLElement>; active: boolean; userId?: string; storagePrefix?: string; title?: string; description?: string;
+export default function SearchCoachmark({ searchRef, targetRef, active, userId = 'local', storagePrefix = 'inventory-search-spotlight-v2', title = 'يمكنك البحث هنا', description = 'ابحث عن أي صنف بالاسم، الرقم، الكود أو المقاس.', variant = 'search' }: {
+  searchRef?: React.RefObject<HTMLInputElement>; targetRef?: React.RefObject<HTMLElement>; active: boolean; userId?: string; storagePrefix?: string; title?: string; description?: string; variant?: 'search' | 'voice';
 }) {
   const [visible, setVisible] = useState(false);
   const [target, setTarget] = useState<Target | null>(null);
@@ -83,7 +83,7 @@ export default function SearchCoachmark({ searchRef, targetRef, active, userId =
   }, [visible, searchRef, targetRef]);
 
   if (!visible) return null;
-  return createPortal(<dialog ref={dialogRef} className="search-spotlight" tabIndex={-1} aria-labelledby={`${id}-title`} aria-describedby={`${id}-copy`}
+  return createPortal(<dialog ref={dialogRef} className={`search-spotlight is-${variant}`} tabIndex={-1} aria-labelledby={`${id}-title`} aria-describedby={`${id}-copy`}
     onCancel={event => { event.preventDefault(); dismiss(); }} onClick={dismiss} dir="rtl">
     {target && <>
       <svg className="search-spotlight-mask" width="100%" height="100%" aria-hidden="true">

@@ -1,3 +1,7 @@
+/* Shared blue for the app's primary floating controls. */
+:root { --inventory-accent-blue: #1268da; --inventory-blue-control: linear-gradient(155deg, #52a3ff, #0867ed 75%); }
+:root.dark { --inventory-accent-blue: #428cf0; --inventory-blue-control: linear-gradient(155deg, #378af0, #1263d4 75%); }
+
 /* V8: quiet guidance, a consistent department index and neutral black surfaces. */
 /* A department index instead of mixed illustrative product samples. */
 .inventory-home .home-category.department-choice { min-height: 126px; text-align: start; align-items: flex-start; padding: 8px 10px 12px; border-radius: 0; }
@@ -248,9 +252,9 @@ html[data-ui-paused] .home-search-glass::after { animation-play-state: paused; }
 .dark .atelier-nav .atelier-nav-active { background: linear-gradient(160deg, #ffffff10, #ffffff06); border: 0; box-shadow: inset 0 1px 0 #ffffff0c; }
 /* The search lens is raised equally in both dock states; only its visible parts take taps. */
 .atelier-nav .atelier-nav-search, .atelier-nav.is-compact .atelier-nav-search { clip-path: none; pointer-events: none; }
-.atelier-nav .atelier-nav-search .atelier-nav-icon, .atelier-nav.is-compact .atelier-nav-search .atelier-nav-icon { top: -9px; width: 50px; height: 50px; pointer-events: auto; background: linear-gradient(155deg, #52a3ff, #0867ed 75%); border: 1.5px solid #ffffffdf; box-shadow: 0 5px 12px #1268da2e, inset 0 1px 1px #ffffff80; }
+.atelier-nav .atelier-nav-search .atelier-nav-icon, .atelier-nav.is-compact .atelier-nav-search .atelier-nav-icon { top: -9px; width: 50px; height: 50px; pointer-events: auto; background: var(--inventory-blue-control); border: 1.5px solid #ffffffdf; box-shadow: 0 5px 12px #1268da2e, inset 0 1px 1px #ffffff80; }
 .atelier-nav .atelier-nav-search .atelier-nav-icon > svg { width: 27px; height: 27px; }
-.dark .atelier-nav .atelier-nav-search .atelier-nav-icon { background: linear-gradient(155deg, #378af0, #1263d4 75%); border-color: #9ac8ff8c; box-shadow: 0 4px 12px #0005, inset 0 1px 1px #ffffff40; }
+.dark .atelier-nav .atelier-nav-search .atelier-nav-icon { background: var(--inventory-blue-control); border-color: #9ac8ff8c; box-shadow: 0 4px 12px #0005, inset 0 1px 1px #ffffff40; }
 .atelier-nav .atelier-nav-search .atelier-nav-label { pointer-events: auto; }
 .atelier-nav.is-compact .atelier-nav-search .atelier-nav-label { pointer-events: none; }
 .atelier-nav .atelier-nav-search:focus-visible, .atelier-nav.is-compact .atelier-nav-search:focus-visible { outline: none; }
@@ -319,19 +323,47 @@ html[data-ui-paused] .home-search-glass::after { animation-play-state: paused; }
 .atelier-menu-warehouse { margin-block-end: 10px; }
 .atelier-menu-warehouse > .atelier-menu-link {
   padding-inline: 12px;
-  border-color: #123e80;
-  background: linear-gradient(160deg, #2461b3, #0e3879);
-  box-shadow: inset 0 1px #ffffff40, 0 3px #0b2f66, 0 6px 12px #0d37633b;
+  border-color: #fff6;
+  background: linear-gradient(155deg, #2b82eb, #095bbb 80%);
+  box-shadow: inset 0 1px #ffffff40, 0 5px 12px #1268da36;
   color: #fff;
   font-size: 15px;
   font-weight: 750;
 }
 .atelier-menu-warehouse > .atelier-menu-link > svg { color: inherit; }
-.atelier-menu-warehouse > .atelier-menu-link:is(:hover, [aria-current]) { background: linear-gradient(160deg, #2d6bc1, #134689); color: #fff; }
+.atelier-menu-warehouse > .atelier-menu-link:is(:hover, [aria-current]) { background: linear-gradient(155deg, #2577d9, #084fa7 80%); color: #fff; }
 .atelier-menu-warehouse > .atelier-menu-link:active { box-shadow: inset 0 1px 3px #08274b55, 0 1px #0b2f66; }
 :root.dark .atelier-menu-warehouse > .atelier-menu-link { border-color: #4a7cc7; color: #fff; }
-:root.dark .atelier-menu-warehouse > .atelier-menu-link:is(:hover, [aria-current]) { background: linear-gradient(160deg, #2d6bc1, #134689); }
+:root.dark .atelier-menu-warehouse > .atelier-menu-link:is(:hover, [aria-current]) { background: linear-gradient(155deg, #2577d9, #084fa7 80%); }
 @media (prefers-contrast: more) {
  .atelier-nav .atelier-nav-glass::before { border-color: #6b83a1; }
  .dark .atelier-nav .atelier-nav-glass::before { border-color: #999; }
+}
+
+/* Read-only launch placeholders mirror the main inventory layout. */
+.launch-pending-frame .atelier-header { inset-inline-start: 0; }
+.launch-pending-frame .launch-pending-content {
+  width: min(100% - 2rem, 72rem);
+  padding-block: clamp(1.25rem, 4vw, 2.5rem) 7rem;
+}
+.launch-skeleton-bar {
+  display: block;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--home-muted, #78889a) 15%, transparent);
+  animation: launch-skeleton-pulse 1.4s ease-in-out infinite alternate;
+}
+.launch-skeleton-greeting { width: 9rem; height: 1.3rem; }
+.launch-skeleton-search { width: min(11rem, 55%); height: .8rem; margin-inline-start: .8rem; }
+.launch-skeleton-stat { width: 3rem; height: .68rem; }
+.launch-pending-content .home-stats { margin-block: .95rem 1.65rem; }
+.launch-skeleton-heading { width: 4.8rem; height: .95rem; margin-block-end: .75rem; }
+.launch-skeleton-categories { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(.4rem, 1.3vw, 1rem); }
+.launch-skeleton-card { height: clamp(5rem, 15vw, 7rem); border-radius: 1.25rem; }
+.launch-skeleton-row { height: 2.4rem; border-radius: .75rem; margin-block: .65rem; }
+.launch-pending-frame .launch-skeleton-nav { left: 50%; pointer-events: none; }
+.launch-skeleton-nav .atelier-nav-glass { min-height: 3.2rem; align-items: center; justify-items: center; }
+.launch-skeleton-dot { width: 1.35rem; height: 1.35rem; }
+@keyframes launch-skeleton-pulse { from { opacity: .55; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .launch-skeleton-bar { animation: none; }
 }
